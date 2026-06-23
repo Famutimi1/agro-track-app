@@ -85,13 +85,13 @@ JWT_EXPIRES_IN="15m"
 JWT_REFRESH_EXPIRES_IN="7d"
 
 # AWS S3
-AWS_ACCESS_KEY_ID="AKIAXXXXXXXXXXXXXXXX"
-AWS_SECRET_ACCESS_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+AWS_ACCESS_KEY_ID="REPLACE_WITH_SECRET"
+AWS_SECRET_ACCESS_KEY="REPLACE_WITH_SECRET"
 AWS_REGION="eu-west-1"
 AWS_S3_BUCKET="agrotrack-prod-uploads"
 
 # Paystack (Live keys)
-PAYSTACK_SECRET_KEY="sk_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+PAYSTACK_SECRET_KEY="REPLACE_WITH_SECRET"
 PAYSTACK_PUBLIC_KEY="pk_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 # SMS - Termii
@@ -99,7 +99,7 @@ TERMII_API_KEY="your-termii-api-key"
 TERMII_SENDER_ID="AgroTrack"
 
 # Email - SendGrid
-SENDGRID_API_KEY="SG.xxxxxxxxxxxxxxxxxxxxxxxx"
+SENDGRID_API_KEY="REPLACE_WITH_SECRET"
 SENDGRID_FROM_EMAIL="noreply@agrotrack.ng"
 SENDGRID_FROM_NAME="AgroTrack"
 
