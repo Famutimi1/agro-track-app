@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #f0fdf4;
+    --surface: #ffffff;
+    --border: #e5e7eb;
+    --text: #111827;
+    --muted: #6b7280;
+    --input-bg: #f9fafb;
+    --sidebar-bg: #1B5E20;
+    --sidebar-border: #145214;
+    --nav-bg: rgba(255, 255, 255, 0.97);
+  }
+
+  .dark {
+    --background: #111827;
+    --surface: #1f2937;
+    --border: #374151;
+    --text: #f9fafb;
+    --muted: #9ca3af;
+    --input-bg: #374151;
+    --sidebar-bg: #0f1923;
+    --sidebar-border: #1f2937;
+    --nav-bg: rgba(17, 24, 39, 0.97);
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-[var(--background)] text-[var(--text)] antialiased;
+  }
+}

@@ -1,0 +1,38 @@
+import { Router } from "express";
+import { authRouter } from "./auth.routes";
+import { lenderRouter } from "./lender.routes";
+import { programRouter } from "./program.routes";
+import { borrowerRouter } from "./borrower.routes";
+import { applicationRoutes } from "./application.routes";
+import { disbursementRouter } from "./disbursement.routes";
+import { repaymentRouter } from "./repayment.routes";
+import { farmReportRouter } from "./farm-report.routes";
+import { farmScoreRouter } from "./farm-score.routes";
+import { fieldAgentRoutes } from "./field-agent.routes";
+import { cooperativeRoutes } from "./cooperative.routes";
+import { ussdRoutes } from "./ussd.routes";
+import { whatsappRoutes } from "./whatsapp.routes";
+import { apiKeyRoutes } from "./apikey.routes";
+import { reportRoutes } from "./report.routes";
+import { messageRouter } from "./message.routes";
+import { adminRouter } from "./admin.routes";
+
+export const router = Router();
+
+router.use("/auth", authRouter);
+router.use("/lenders", lenderRouter);
+router.use("/programs", programRouter);
+router.use("/borrowers", borrowerRouter);
+router.use("/applications", applicationRoutes);
+router.use("/disbursements", disbursementRouter);
+router.use("/repayments", repaymentRouter);
+router.use("/farm-reports", farmReportRouter);
+router.use("/farm-score", farmScoreRouter);
+router.use("/field-agents", fieldAgentRoutes);
+router.use("/cooperatives", cooperativeRoutes);
+router.use("/ussd", ussdRoutes);
+router.use("/whatsapp", whatsappRoutes);
+router.use("/api-keys", apiKeyRoutes);
+router.use("/reports", reportRoutes);
+router.use("/messages", messageRouter);
+router.use("/admin", adminRouter);

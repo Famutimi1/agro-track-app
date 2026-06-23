@@ -1,0 +1,798 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  SUPER_ADMIN
+  LENDER_ADMIN
+  LENDER_MANAGER
+  LENDER_VIEWER
+  LENDER_ANALYST
+  BORROWER
+  FIELD_AGENT
+  FIELD_SUPERVISOR
+  COOP_CHAIR
+}
+
+enum LoanStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  DEFAULTED
+  CANCELLED
+}
+
+enum DisbursementStatus {
+  PENDING
+  APPROVED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum RepaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  PARTIAL
+}
+
+enum ProgramStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  CLOSED
+}
+
+enum ProgramType {
+  INPUT_CREDIT
+  CASH_LOAN
+  EQUIPMENT_LEASE
+  INSURANCE
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum FarmReportStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum CropGrowthStage {
+  PLANTING
+  GERMINATION
+  VEGETATIVE
+  FLOWERING
+  FRUITING
+  HARVEST
+  POST_HARVEST
+}
+
+enum CoopStatus {
+  ACTIVE
+  SUSPENDED
+  DISSOLVED
+}
+
+enum LenderPlan {
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
+
+enum LenderStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum NotificationChannel {
+  IN_APP
+  SMS
+  EMAIL
+  PUSH
+  WHATSAPP
+}
+
+enum NotificationType {
+  LOAN_UPDATE
+  PAYMENT_DUE
+  PAYMENT_RECEIVED
+  APPLICATION_STATUS
+  FARM_ALERT
+  DISBURSEMENT
+  SYSTEM
+}
+
+enum RepaymentMethod {
+  BANK_TRANSFER
+  CARD
+  USSD
+  MOBILE_MONEY
+  CASH
+}
+
+enum DocumentType {
+  ID_CARD
+  BVN_SLIP
+  UTILITY_BILL
+  FARM_PHOTO
+  LAND_TITLE
+  BANK_STATEMENT
+  COOPERATIVE_CERT
+  OTHER
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+  EXPIRED
+}
+
+enum TransactionType {
+  DISBURSEMENT
+  REPAYMENT
+  REFUND
+  FEE
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REVERSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// ─── MODELS ──────────────────────────────────────────────────────────────────
+
+model User {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  phone               String?
+  passwordHash        String
+  firstName           String
+  lastName            String
+  role                Role
+  emailVerified       Boolean   @default(false)
+  phoneVerified       Boolean   @default(false)
+  twoFactorEnabled    Boolean   @default(false)
+  twoFactorSecret     String?
+  avatarUrl           String?
+  isActive            Boolean   @default(true)
+  lastLoginAt         DateTime?
+  lastLoginIp         String?
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  lenderOrg       LenderOrganization? @relation(fields: [lenderOrgId], references: [id])
+  lenderOrgId     String?
+  borrowerProfile BorrowerProfile?
+  agentProfile    FieldAgentProfile?
+  refreshTokens   RefreshToken[]
+  passwordResets  PasswordReset[]
+  notifications   Notification[]
+  sentMessages    Message[]           @relation("SentMessages")
+  conversations   Conversation[]      @relation("ConversationParticipants")
+  auditLogs       AuditLog[]
+  supportTickets  SupportTicket[]
+  documents       Document[]
+  apiKeys         ApiKey[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ─── LENDER ──────────────────────────────────────────────────────────────────
+
+model LenderOrganization {
+  id              String       @id @default(cuid())
+  name            String
+  type            String
+  cacNumber       String?      @unique
+  plan            LenderPlan   @default(STARTER)
+  status          LenderStatus @default(PENDING)
+  verified        Boolean      @default(false)
+  email           String
+  phone           String?
+  address         String?
+  state           String?
+  website         String?
+  logoUrl         String?
+  totalDisbursed  Decimal      @default(0) @db.Decimal(14, 2)
+  totalRecovered  Decimal      @default(0) @db.Decimal(14, 2)
+  defaultRate     Float        @default(0)
+  activeBorrowers Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  users        User[]
+  programs     Program[]
+  cooperatives Cooperative[]
+  webhooks     Webhook[]
+}
+
+// ─── PROGRAMS ────────────────────────────────────────────────────────────────
+
+model Program {
+  id                 String             @id @default(cuid())
+  lenderOrgId        String
+  lenderOrg          LenderOrganization @relation(fields: [lenderOrgId], references: [id])
+  name               String
+  description        String
+  type               ProgramType        @default(CASH_LOAN)
+  interestRate       Float
+  maxAmount          Decimal            @db.Decimal(12, 2)
+  minAmount          Decimal            @db.Decimal(12, 2)
+  durationMonths     Int
+  requiredScore      Int                @default(0)
+  targetCrops        String[]
+  targetStates       String[]
+  maxBorrowers       Int?
+  gracePeriodDays    Int                @default(0)
+  disbursementType   String             @default("FULL")
+  trancheCount       Int                @default(1)
+  collateralRequired Boolean            @default(false)
+  insuranceRequired  Boolean            @default(false)
+  status             ProgramStatus      @default(DRAFT)
+  startDate          DateTime?
+  endDate            DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  loans        BorrowerLoan[]
+  applications Application[]
+
+  @@index([lenderOrgId])
+  @@index([status])
+  @@index([type])
+}
+
+// ─── BORROWER ────────────────────────────────────────────────────────────────
+
+model BorrowerProfile {
+  id                String       @id @default(cuid())
+  userId            String       @unique
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farmerId          String       @unique
+  bvn               String?
+  bvnVerified       Boolean      @default(false)
+  nin               String?
+  ninVerified       Boolean      @default(false)
+  dateOfBirth       DateTime?
+  gender            String?
+  state             String
+  lga               String
+  address           String?
+  farmSizeHa        Float
+  farmLatitude      Float?
+  farmLongitude     Float?
+  farmAddress       String?
+  primaryCrop       String
+  secondaryCrops    String[]
+  farmScore         Int          @default(300)
+  farmScoreTier     String       @default("POOR")
+  bankName          String?
+  bankAccount       String?
+  bankCode          String?
+  language          String       @default("en")
+  yearsExperience   Int          @default(1)
+  irrigationType    String?
+  soilType          String?
+  cooperativeId     String?
+  cooperative       Cooperative? @relation(fields: [cooperativeId], references: [id])
+  guarantorName     String?
+  guarantorPhone    String?
+  guarantorRelation String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  loans        BorrowerLoan[]
+  farmReports  FarmReport[]
+  scoreHistory FarmScoreHistory[]
+  applications Application[]
+  documents    Document[]
+
+  @@index([state])
+  @@index([farmScore])
+  @@index([farmerId])
+  @@index([cooperativeId])
+}
+
+model BorrowerLoan {
+  id              String          @id @default(cuid())
+  borrowerId      String
+  borrower        BorrowerProfile @relation(fields: [borrowerId], references: [id])
+  programId       String
+  program         Program         @relation(fields: [programId], references: [id])
+  applicationId   String?
+  application     Application?    @relation(fields: [applicationId], references: [id])
+  amount          Decimal         @db.Decimal(12, 2)
+  interestRate    Float
+  totalRepayable  Decimal         @db.Decimal(12, 2)
+  amountPaid      Decimal         @default(0) @db.Decimal(12, 2)
+  status          LoanStatus      @default(PENDING)
+  trancheCount    Int             @default(1)
+  currentTranche  Int             @default(0)
+  startDate       DateTime?
+  endDate         DateTime?
+  nextPaymentDate DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  disbursements Disbursement[]
+  repayments    Repayment[]
+
+  @@index([borrowerId])
+  @@index([programId])
+  @@index([status])
+  @@index([applicationId])
+}
+
+// ─── DISBURSEMENTS & REPAYMENTS ──────────────────────────────────────────────
+
+model Disbursement {
+  id              String             @id @default(cuid())
+  loanId          String
+  loan            BorrowerLoan       @relation(fields: [loanId], references: [id])
+  trancheNumber   Int                @default(1)
+  amount          Decimal            @db.Decimal(12, 2)
+  status          DisbursementStatus @default(PENDING)
+  approvedBy      String?
+  approvedAt      DateTime?
+  failureReason   String?
+  paymentRef      String?            @unique
+  processedAt     DateTime?
+  proofDocumentId String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([loanId])
+  @@index([status])
+  @@index([trancheNumber])
+}
+
+model Repayment {
+  id            String           @id @default(cuid())
+  loanId        String
+  loan          BorrowerLoan     @relation(fields: [loanId], references: [id])
+  amount        Decimal          @db.Decimal(12, 2)
+  dueDate       DateTime
+  status        RepaymentStatus  @default(PENDING)
+  paidAmount    Decimal?         @db.Decimal(12, 2)
+  paidAt        DateTime?
+  paymentMethod RepaymentMethod?
+  paymentRef    String?          @unique
+  transactionId String?
+  penaltyAmount Decimal?         @db.Decimal(12, 2)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([loanId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+// ─── FARM REPORTS & SCORE ────────────────────────────────────────────────────
+
+model FarmReport {
+  id            String           @id @default(cuid())
+  borrowerId    String
+  borrower      BorrowerProfile  @relation(fields: [borrowerId], references: [id])
+  submittedById String?
+  type          String
+  title         String
+  description   String?
+  cropStage     CropGrowthStage?
+  healthRating  Int?
+  images        String[]
+  latitude      Float?
+  longitude     Float?
+  status        FarmReportStatus @default(PENDING)
+  verifiedBy    String?
+  verifiedAt    DateTime?
+  rejectionNote String?
+  weatherData   Json?
+  soilMoisture  Float?
+  pestPresent   Boolean          @default(false)
+  pestDetails   String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([borrowerId])
+  @@index([status])
+  @@index([cropStage])
+}
+
+model FarmScoreHistory {
+  id            String          @id @default(cuid())
+  borrowerId    String
+  borrower      BorrowerProfile @relation(fields: [borrowerId], references: [id])
+  score         Int
+  previousScore Int?
+  tier          String
+  components    Json
+  changeReason  String?
+  calculatedAt  DateTime        @default(now())
+
+  @@index([borrowerId])
+  @@index([calculatedAt])
+}
+
+// ─── FIELD AGENTS ────────────────────────────────────────────────────────────
+
+model FieldAgentProfile {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentCode      String    @unique
+  state          String
+  lga            String?
+  coverageArea   String[]
+  registrations  Int       @default(0)
+  verifications  Int       @default(0)
+  inspections    Int       @default(0)
+  rating         Float     @default(0)
+  totalRatings   Int       @default(0)
+  commissionRate Float     @default(0)
+  totalEarnings  Decimal   @default(0) @db.Decimal(12, 2)
+  supervisorId   String?
+  active         Boolean   @default(true)
+  lastActivityAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  visits FieldVisit[]
+
+  @@index([state])
+  @@index([supervisorId])
+  @@index([agentCode])
+}
+
+// ─── COOPERATIVES ────────────────────────────────────────────────────────────
+
+model Cooperative {
+  id            String              @id @default(cuid())
+  name          String
+  regNumber     String?             @unique
+  state         String
+  lga           String?
+  address       String?
+  chairPersonId String?
+  memberCount   Int                 @default(0)
+  maxMembers    Int                 @default(100)
+  status        CoopStatus          @default(ACTIVE)
+  lenderOrgId   String?
+  lenderOrg     LenderOrganization? @relation(fields: [lenderOrgId], references: [id])
+  totalLoans    Decimal             @default(0) @db.Decimal(14, 2)
+  repaymentRate Float               @default(0)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  members BorrowerProfile[]
+
+  @@index([state])
+  @@index([status])
+}
+
+// ─── MESSAGING ───────────────────────────────────────────────────────────────
+
+model Conversation {
+  id           String    @id @default(cuid())
+  participants User[]    @relation("ConversationParticipants")
+  messages     Message[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id])
+  content        String
+  read           Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+// ─── NOTIFICATIONS ───────────────────────────────────────────────────────────
+
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  type      NotificationType    @default(SYSTEM)
+  channel   NotificationChannel @default(IN_APP)
+  read      Boolean             @default(false)
+  readAt    DateTime?
+  data      Json?
+  actionUrl String?
+  createdAt DateTime            @default(now())
+
+  @@index([userId, read])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ─── ADMIN / PLATFORM ────────────────────────────────────────────────────────
+
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String?
+  enabled     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SupportTicket {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id])
+  subject     String
+  description String?
+  priority    TicketPriority @default(MEDIUM)
+  status      TicketStatus   @default(OPEN)
+  resolvedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([status])
+  @@index([priority])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  resource   String
+  resourceId String?
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([resource])
+  @@index([createdAt])
+  @@index([action])
+}
+
+// ─── APPLICATIONS ────────────────────────────────────────────────────────────
+
+model Application {
+  id               String            @id @default(cuid())
+  borrowerId       String
+  borrower         BorrowerProfile   @relation(fields: [borrowerId], references: [id])
+  programId        String
+  program          Program           @relation(fields: [programId], references: [id])
+  amount           Decimal           @db.Decimal(12, 2)
+  purpose          String?
+  status           ApplicationStatus @default(DRAFT)
+  farmScoreAtApply Int?
+  submittedAt      DateTime?
+  reviewedBy       String?
+  reviewedAt       DateTime?
+  rejectionReason  String?
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  loans     BorrowerLoan[]
+  documents Document[]
+
+  @@index([borrowerId])
+  @@index([programId])
+  @@index([status])
+}
+
+// ─── DOCUMENTS ───────────────────────────────────────────────────────────────
+
+model Document {
+  id              String             @id @default(cuid())
+  userId          String?
+  user            User?              @relation(fields: [userId], references: [id])
+  borrowerId      String?
+  borrower        BorrowerProfile?   @relation(fields: [borrowerId], references: [id])
+  applicationId   String?
+  application     Application?       @relation(fields: [applicationId], references: [id])
+  type            DocumentType
+  fileName        String
+  fileUrl         String
+  fileSize        Int?
+  mimeType        String?
+  status          VerificationStatus @default(PENDING)
+  verifiedBy      String?
+  verifiedAt      DateTime?
+  rejectionReason String?
+  expiresAt       DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([borrowerId])
+  @@index([applicationId])
+  @@index([type])
+}
+
+// ─── TRANSACTIONS ────────────────────────────────────────────────────────────
+
+model Transaction {
+  id            String            @id @default(cuid())
+  reference     String            @unique
+  type          TransactionType
+  status        TransactionStatus @default(PENDING)
+  amount        Decimal           @db.Decimal(12, 2)
+  currency      String            @default("NGN")
+  provider      String?
+  providerRef   String?
+  loanId        String?
+  borrowerId    String?
+  metadata      Json?
+  failureReason String?
+  processedAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([reference])
+  @@index([type])
+  @@index([status])
+  @@index([loanId])
+  @@index([borrowerId])
+}
+
+// ─── FIELD VISITS ────────────────────────────────────────────────────────────
+
+model FieldVisit {
+  id          String            @id @default(cuid())
+  agentId     String
+  agent       FieldAgentProfile @relation(fields: [agentId], references: [id])
+  borrowerId  String?
+  purpose     String
+  notes       String?
+  latitude    Float?
+  longitude   Float?
+  images      String[]
+  status      String            @default("SCHEDULED")
+  scheduledAt DateTime?
+  completedAt DateTime?
+  rating      Int?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([agentId])
+  @@index([borrowerId])
+  @@index([status])
+}
+
+// ─── WEBHOOKS ────────────────────────────────────────────────────────────────
+
+model Webhook {
+  id            String             @id @default(cuid())
+  lenderOrgId   String
+  lenderOrg     LenderOrganization @relation(fields: [lenderOrgId], references: [id])
+  url           String
+  secret        String
+  events        String[]
+  active        Boolean            @default(true)
+  lastTriggered DateTime?
+  failCount     Int                @default(0)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([lenderOrgId])
+}
+
+// ─── API KEYS ────────────────────────────────────────────────────────────────
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  keyHash     String    @unique
+  prefix      String
+  permissions String[]
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([keyHash])
+}
+
+// ─── WEATHER DATA ────────────────────────────────────────────────────────────
+
+model WeatherAlert {
+  id          String    @id @default(cuid())
+  state       String
+  lga         String?
+  alertType   String
+  severity    String
+  title       String
+  description String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  source      String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  @@index([state])
+  @@index([active])
+}
+
+// ─── SYSTEM CONFIG ───────────────────────────────────────────────────────────
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  category  String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+}
