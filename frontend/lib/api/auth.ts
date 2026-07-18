@@ -12,14 +12,40 @@ export interface User {
   phoneVerified: boolean;
   twoFactorEnabled: boolean;
   createdAt: string;
-  lenderOrg?: { id: string; name: string; plan: string };
+  lenderOrg?: { id: string; name: string; plan: string; phone?: string; address?: string };
   borrowerProfile?: {
     farmerId: string;
     farmScore: number;
     farmScoreTier: string;
     state: string;
+    lga?: string;
+    address?: string;
+    farmSizeHa?: number;
     primaryCrop: string;
+    bankName?: string;
+    bankAccount?: string;
+    language?: string;
   };
+}
+
+export interface UpdateProfileRequest {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  avatarUrl?: string;
+  // Borrower fields
+  state?: string;
+  lga?: string;
+  address?: string;
+  farmSizeHa?: number;
+  primaryCrop?: string;
+  bankName?: string;
+  bankAccount?: string;
+  language?: string;
+  // Lender organization fields
+  organizationName?: string;
+  organizationPhone?: string;
+  organizationAddress?: string;
 }
 
 export interface LoginRequest {
@@ -95,6 +121,11 @@ export const authApi = {
 
   getProfile: async () => {
     const res = await api.get<ApiResponse<User>>("/auth/me");
+    return res.data.data;
+  },
+
+  updateProfile: async (data: UpdateProfileRequest) => {
+    const res = await api.patch<ApiResponse<User>>("/auth/me", data);
     return res.data.data;
   },
 

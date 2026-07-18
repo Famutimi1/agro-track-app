@@ -16,10 +16,15 @@ import { apiKeyRoutes } from "./apikey.routes";
 import { reportRoutes } from "./report.routes";
 import { messageRouter } from "./message.routes";
 import { adminRouter } from "./admin.routes";
+import { dashboardRouter } from "./dashboard.routes";
+import { loanRoutes } from "./loan.routes";
+import { mapRoutes } from "./map.routes";
+import { notificationRouter } from "./notification.routes";
 
 export const router = Router();
 
 router.use("/auth", authRouter);
+router.use("/dashboard", dashboardRouter);
 router.use("/lenders", lenderRouter);
 router.use("/programs", programRouter);
 router.use("/borrowers", borrowerRouter);
@@ -36,3 +41,6 @@ router.use("/api-keys", apiKeyRoutes);
 router.use("/reports", reportRoutes);
 router.use("/messages", messageRouter);
 router.use("/admin", adminRouter);
+router.use("/loans", loanRoutes);
+router.use("/map", mapRoutes);
+router.use("/notifications", notificationRouter);

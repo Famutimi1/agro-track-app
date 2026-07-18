@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { User, authApi } from "../api";
+import { User, authApi, UpdateProfileRequest } from "../api";
 import { AxiosError } from "axios";
 
 const isBrowser = typeof window !== "undefined";
@@ -29,16 +29,17 @@ interface AuthState {
   setUser: (user: User | null) => void;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  refreshUser: (forceRefresh?: boolean) => Promise<void>;
+  updateProfile: (data: UpdateProfileRequest) => Promise<void>;
   clearError: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       isAuthenticated: false,
-      isLoading: false,
+      isLoading: true,
       error: null,
 
       setUser: (user) => set({ user, isAuthenticated: !!user }),
@@ -73,10 +74,17 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      refreshUser: async () => {
+      refreshUser: async (forceRefresh = false) => {
         const token = safeLocalStorage.getItem("accessToken");
         if (!token) {
           set({ user: null, isAuthenticated: false, isLoading: false });
+          return;
+        }
+
+        // Skip API call if user already exists (from hydration) unless forced
+        const { user, isAuthenticated } = get();
+        if (!forceRefresh && user && isAuthenticated) {
+          set({ isLoading: false });
           return;
         }
 
@@ -94,6 +102,19 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearError: () => set({ error: null }),
+
+      updateProfile: async (data) => {
+        set({ isLoading: true, error: null });
+        try {
+          const user = await authApi.updateProfile(data);
+          set({ user, isAuthenticated: true, isLoading: false, error: null });
+        } catch (err) {
+          const axiosError = err as AxiosError<{ message?: string }>;
+          const message = axiosError.response?.data?.message || "Failed to update profile";
+          set({ error: message, isLoading: false });
+          throw err;
+        }
+      },
     }),
     {
       name: "auth-storage",
@@ -103,6 +124,17 @@ export const useAuthStore = create<AuthState>()(
         removeItem: () => {},
       })),
       partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error("Auth hydration failed:", error);
+          return;
+        }
+        // After hydration, just set isLoading to false
+        // The user/isAuthenticated are already restored from localStorage
+        if (state) {
+          state.isLoading = false;
+        }
+      },
     }
   )
 );

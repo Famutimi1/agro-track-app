@@ -8,21 +8,22 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/lib/stores";
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-  { icon: FileText, label: "Applications", href: "/applications" },
-  { icon: Wallet, label: "Loans", href: "/loans" },
-  { icon: Sprout, label: "Loan Programs", href: "/loan-programs" },
-  { icon: Users, label: "Borrowers", href: "/borrowers" },
-  { icon: Banknote, label: "Disbursements", href: "/disbursements" },
-  { icon: RefreshCw, label: "Repayments", href: "/repayments" },
-  { icon: UserCheck, label: "Field Agents", href: "/field-agents" },
-  { icon: Users, label: "Cooperatives", href: "/cooperatives" },
-  { icon: BarChart2, label: "Reports", href: "/reports" },
-  { icon: Map, label: "Map View", href: "/map-view" },
-  { icon: MessageSquare, label: "Messages", href: "/lender-messages" },
-  { icon: Settings, label: "Settings", href: "/lender-settings" },
+  { icon: LayoutDashboard, label: "Dashboard", href: "/lender/dashboard" },
+  { icon: FileText, label: "Applications", href: "/lender/applications" },
+  { icon: Wallet, label: "Loans", href: "/lender/loans" },
+  { icon: Sprout, label: "Loan Programs", href: "/lender/loan-programs" },
+  { icon: Users, label: "Borrowers", href: "/lender/borrowers" },
+  { icon: Banknote, label: "Disbursements", href: "/lender/disbursements" },
+  { icon: RefreshCw, label: "Repayments", href: "/lender/repayments" },
+  { icon: UserCheck, label: "Field Agents", href: "/lender/field-agents" },
+  { icon: Users, label: "Cooperatives", href: "/lender/cooperatives" },
+  { icon: BarChart2, label: "Reports", href: "/lender/reports" },
+  { icon: Map, label: "Map View", href: "/lender/map-view" },
+  { icon: MessageSquare, label: "Messages", href: "/lender/messages" },
+  { icon: Settings, label: "Settings", href: "/lender/settings" },
 ];
 
 interface LenderSidebarProps {
@@ -31,6 +32,19 @@ interface LenderSidebarProps {
 
 export function LenderSidebar({ open }: LenderSidebarProps) {
   const pathname = usePathname();
+  const user = useAuthStore((s) => s.user);
+
+  const orgName = user?.lenderOrg?.name ?? `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim();
+  const roleLabel =
+    user?.role === "LENDER_ADMIN" ? "Admin Account" :
+    user?.role === "LENDER_MANAGER" ? "Manager" :
+    user?.role === "LENDER_VIEWER" ? "Viewer" : "Lender Account";
+
+  const orgInitials = orgName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("") || "LA";
 
   return (
     <aside
@@ -75,13 +89,13 @@ export function LenderSidebar({ open }: LenderSidebarProps) {
         <div className="px-4 py-3 border-t border-white/10">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-brand-gold flex items-center justify-center text-brand-green font-bold text-xs flex-shrink-0">
-              FM
+              {orgInitials}
             </div>
-            <div>
-              <p className="text-white text-xs font-semibold whitespace-nowrap">
-                Fed. Min. of Agriculture
+            <div className="min-w-0">
+              <p className="text-white text-xs font-semibold whitespace-nowrap truncate max-w-[160px]">
+                {orgName || "Account"}
               </p>
-              <p className="text-white/45 text-[11px]">Admin Account</p>
+              <p className="text-white/45 text-[11px]">{roleLabel}</p>
             </div>
           </div>
         </div>

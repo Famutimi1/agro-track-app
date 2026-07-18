@@ -5,6 +5,10 @@ dotenv.config();
 
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
+  REDIS_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
   REDIS_URL: z.string().default("redis://localhost:6379"),
   JWT_SECRET: z.string().min(16),
   JWT_REFRESH_SECRET: z.string().min(16),
@@ -30,6 +34,9 @@ const envSchema = z.object({
   AWS_S3_BUCKET: z.string().optional(),
   TERMII_API_KEY: z.string().optional(),
   SENDGRID_API_KEY: z.string().optional(),
+  PLATFORM_BANK_NAME: z.string().default("AgroTrack Microfinance Bank"),
+  PLATFORM_BANK_ACCOUNT: z.string().default("0123456789"),
+  PLATFORM_BANK_ACCOUNT_NAME: z.string().default("AgroTrack Ltd"),
 });
 
 const parsed = envSchema.safeParse(process.env);

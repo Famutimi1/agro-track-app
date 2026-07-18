@@ -24,7 +24,19 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      router.push("/dashboard");
+      const { user } = useAuthStore.getState();
+      const role = user?.role ?? "";
+
+      if (role === "BORROWER") {
+        router.push("/borrower/overview");
+      } else if (["FIELD_AGENT", "FIELD_SUPERVISOR"].includes(role)) {
+        router.push("/agent/dashboard");
+      } else if (role === "SUPER_ADMIN") {
+        router.push("/admin/dashboard");
+      } else {
+        // All lender roles
+        router.push("/lender/dashboard");
+      }
     } catch {
       // Error is handled in store
     }
@@ -34,7 +46,7 @@ export default function LoginPage() {
     <Card className="p-8">
       <h1 className="text-xl font-bold text-[var(--text)] mb-1">Welcome back</h1>
       <p className="text-sm text-[var(--muted)] mb-6">
-        Sign in to your lender dashboard
+        Sign in to your AgroTrack account
       </p>
 
       {error && (
@@ -122,11 +134,17 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <div className="mt-6 pt-5 border-t border-[var(--border)] text-center">
-        <p className="text-[11px] text-[var(--muted)] mb-3">Or sign in as</p>
-        <Link href="/register" className="text-xs text-brand-green font-semibold hover:underline">
-          Borrower Portal →
-        </Link>
+      <div className="mt-6 pt-5 border-t border-[var(--border)] text-center space-y-2">
+        <p className="text-[11px] text-[var(--muted)]">New to AgroTrack?</p>
+        <div className="flex justify-center gap-4 text-xs">
+          <Link href="/signup" className="text-brand-green font-semibold hover:underline">
+            Register as Lender →
+          </Link>
+          <span className="text-[var(--muted)]">|</span>
+          <Link href="/register" className="text-brand-green font-semibold hover:underline">
+            Register as Borrower →
+          </Link>
+        </div>
       </div>
     </Card>
   );

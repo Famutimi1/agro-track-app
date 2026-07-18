@@ -3,6 +3,7 @@
 import { Menu, Search, Moon, Sun, Bell, Plus } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import { UserMenu } from "./user-menu";
 
 interface LenderTopbarProps {
   sidebarOpen: boolean;
@@ -65,6 +66,8 @@ export function LenderTopbar({
             <Plus size={15} /> {newLabel}
           </Button>
         )}
+
+        <UserMenu settingsHref="/lender/settings" />
       </div>
     </header>
   );

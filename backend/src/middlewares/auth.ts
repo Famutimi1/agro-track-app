@@ -9,6 +9,7 @@ interface JwtPayload {
   email: string;
   role: Role;
   lenderId?: string;
+  lenderOrgId?: string;
 }
 
 declare global {
@@ -30,6 +31,10 @@ export function authenticate(req: Request, _res: Response, next: NextFunction) {
 
   try {
     const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+    // Support both lenderId and lenderOrgId (alias)
+    if (payload.lenderId && !payload.lenderOrgId) {
+      payload.lenderOrgId = payload.lenderId;
+    }
     req.user = payload;
     next();
   } catch {

@@ -44,6 +44,12 @@ export function useCreateFarmReport() {
   });
 }
 
+export function useUploadFarmReportPhotos() {
+  return useMutation({
+    mutationFn: (files: File[]) => farmReportsApi.uploadPhotos(files),
+  });
+}
+
 export function useVerifyFarmReport() {
   const queryClient = useQueryClient();
 

@@ -114,7 +114,7 @@ export default function RegisterPage() {
   };
 
   const handleGoToDashboard = () => {
-    router.push("/overview");
+    router.push("/borrower/overview");
   };
 
   return (

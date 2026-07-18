@@ -14,17 +14,18 @@ export interface Notification {
   createdAt: string;
 }
 
-export interface NotificationPreferences {
-  email: boolean;
-  sms: boolean;
-  push: boolean;
-  whatsapp: boolean;
-  inApp: boolean;
-  loanReminders: boolean;
-  paymentConfirmations: boolean;
-  marketingMessages: boolean;
-  weeklyDigest: boolean;
-}
+export type NotificationEventType =
+  | "LOAN_UPDATE"
+  | "PAYMENT_DUE"
+  | "PAYMENT_RECEIVED"
+  | "APPLICATION_STATUS"
+  | "FARM_ALERT"
+  | "DISBURSEMENT"
+  | "SYSTEM";
+
+export type NotificationChannelType = "IN_APP" | "SMS" | "EMAIL" | "WHATSAPP";
+
+export type NotificationPreferences = Record<NotificationEventType, Record<NotificationChannelType, boolean>>;
 
 export interface NotificationsQuery {
   page?: number;
@@ -62,7 +63,7 @@ export const notificationsApi = {
     return res.data.data;
   },
 
-  updatePreferences: async (preferences: Partial<NotificationPreferences>) => {
+  updatePreferences: async (preferences: NotificationPreferences) => {
     const res = await api.patch<ApiResponse<NotificationPreferences>>(
       "/notifications/preferences",
       preferences

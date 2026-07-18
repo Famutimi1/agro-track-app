@@ -2,7 +2,7 @@ import http from "http";
 import { app } from "./app";
 import { env } from "./config/env";
 import { prisma } from "./config/prisma";
-import { connectRedis, redis } from "./config/redis";
+import { connectRedis, redis, redisEnabled } from "./config/redis";
 import { logger } from "./config/logger";
 import { initializeSocket } from "./config/socket";
 import { initializeQueues, closeQueues } from "./config/queue";
@@ -15,8 +15,10 @@ async function main() {
 
   await initializeQueues();
 
-  // Import workers (they self-register)
-  await import("./workers");
+  // Import workers (they self-register). Only meaningful when Redis is enabled.
+  if (redisEnabled) {
+    await import("./workers");
+  }
 
   const server = http.createServer(app);
   initializeSocket(server);

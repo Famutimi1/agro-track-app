@@ -124,6 +124,22 @@ export class NotificationService {
     });
   }
 
+  static async getPreferences(userId: string) {
+    const existing = await prisma.notificationPreference.findUnique({ where: { userId } });
+    if (existing) return existing.matrix as Record<string, Record<string, boolean>>;
+    return defaultPreferenceMatrix();
+  }
+
+  static async updatePreferences(userId: string, matrix: Record<string, Record<string, boolean>>) {
+    const preference = await prisma.notificationPreference.upsert({
+      where: { userId },
+      create: { userId, matrix },
+      update: { matrix },
+    });
+
+    return preference.matrix as Record<string, Record<string, boolean>>;
+  }
+
   private static async queueEmail(payload: NotificationPayload) {
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
@@ -222,3 +238,26 @@ export const NotificationTemplates = {
     type: "FARM_ALERT" as NotificationType,
   }),
 };
+
+export const PREFERENCE_EVENT_TYPES: NotificationType[] = [
+  "LOAN_UPDATE",
+  "PAYMENT_DUE",
+  "PAYMENT_RECEIVED",
+  "APPLICATION_STATUS",
+  "FARM_ALERT",
+  "DISBURSEMENT",
+  "SYSTEM",
+];
+
+export const PREFERENCE_CHANNEL_TYPES: NotificationChannel[] = ["IN_APP", "SMS", "EMAIL", "WHATSAPP"];
+
+function defaultPreferenceMatrix(): Record<string, Record<string, boolean>> {
+  const matrix: Record<string, Record<string, boolean>> = {};
+  for (const eventType of PREFERENCE_EVENT_TYPES) {
+    matrix[eventType] = {};
+    for (const channel of PREFERENCE_CHANNEL_TYPES) {
+      matrix[eventType][channel] = true;
+    }
+  }
+  return matrix;
+}

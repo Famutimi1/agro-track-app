@@ -1,13 +1,32 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma";
 import { ApiError } from "../utils/api-error";
 import { getPagination, paginatedResponse, PaginationQuery } from "../utils/pagination";
 import { logger } from "../config/logger";
 
+interface DisbursementQuery extends PaginationQuery {
+  status?: string;
+  programId?: string;
+  state?: string;
+  trancheNumber?: number;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 export class DisbursementService {
-  static async getAll(lenderOrgId: string, query: PaginationQuery & { status?: string }) {
+  static async getAll(lenderOrgId: string, query: DisbursementQuery) {
     const { page, limit, skip } = getPagination(query);
-    const where: any = { loan: { program: { lenderOrgId } } };
-    if (query.status) where.status = query.status;
+    const where: Prisma.DisbursementWhereInput = { loan: { program: { lenderOrgId } } };
+
+    if (query.status) where.status = query.status as any;
+    if (query.programId) where.loan = { ...where.loan as any, programId: query.programId };
+    if (query.state) where.loan = { ...where.loan as any, borrower: { state: query.state } };
+    if (query.trancheNumber) where.trancheNumber = Number(query.trancheNumber);
+    if (query.dateFrom || query.dateTo) {
+      where.createdAt = {};
+      if (query.dateFrom) where.createdAt.gte = new Date(query.dateFrom);
+      if (query.dateTo) where.createdAt.lte = new Date(query.dateTo);
+    }
 
     const [disbursements, total] = await Promise.all([
       prisma.disbursement.findMany({
@@ -15,8 +34,17 @@ export class DisbursementService {
         include: {
           loan: {
             include: {
-              borrower: { include: { user: { select: { firstName: true, lastName: true } } } },
-              program: { select: { name: true } },
+              borrower: {
+                select: {
+                  id: true,
+                  farmerId: true,
+                  farmScore: true,
+                  farmScoreTier: true,
+                  state: true,
+                  user: { select: { firstName: true, lastName: true } },
+                },
+              },
+              program: { select: { id: true, name: true } },
             },
           },
         },
@@ -24,7 +52,179 @@ export class DisbursementService {
       prisma.disbursement.count({ where }),
     ]);
 
-    return paginatedResponse(disbursements, total, page, limit);
+    const formatted = disbursements.map((d) => ({
+      ...d,
+      amount: Number(d.amount),
+      daysWaiting: Math.floor((Date.now() - new Date(d.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+    }));
+
+    return paginatedResponse(formatted, total, page, limit);
+  }
+
+  static async getPending(lenderOrgId: string, query: PaginationQuery) {
+    const { page, limit, skip } = getPagination(query);
+    const where: Prisma.DisbursementWhereInput = {
+      status: { in: ["PENDING", "APPROVED"] },
+      loan: { program: { lenderOrgId } },
+    };
+
+    const [disbursements, total] = await Promise.all([
+      prisma.disbursement.findMany({
+        where, skip, take: limit,
+        orderBy: { createdAt: "asc" },
+        include: {
+          loan: {
+            include: {
+              borrower: {
+                select: {
+                  id: true,
+                  farmerId: true,
+                  state: true,
+                  user: { select: { firstName: true, lastName: true } },
+                },
+              },
+              program: { select: { id: true, name: true } },
+            },
+          },
+        },
+      }),
+      prisma.disbursement.count({ where }),
+    ]);
+
+    const formatted = disbursements.map((d) => ({
+      ...d,
+      amount: Number(d.amount),
+      daysWaiting: Math.floor((Date.now() - new Date(d.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+    }));
+
+    return paginatedResponse(formatted, total, page, limit);
+  }
+
+  static async getById(id: string, lenderOrgId: string) {
+    const disbursement = await prisma.disbursement.findFirst({
+      where: {
+        id,
+        loan: { program: { lenderOrgId } },
+      },
+      include: {
+        loan: {
+          include: {
+            borrower: {
+              select: {
+                id: true,
+                farmerId: true,
+                state: true,
+                user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
+              },
+            },
+            program: { select: { id: true, name: true, interestRate: true } },
+          },
+        },
+      },
+    });
+
+    if (!disbursement) throw ApiError.notFound("Disbursement not found");
+
+    return {
+      ...disbursement,
+      amount: Number(disbursement.amount),
+    };
+  }
+
+  static async getStats(lenderOrgId: string) {
+    const baseWhere = { loan: { program: { lenderOrgId } } };
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const [
+      pendingCount,
+      pendingAmount,
+      approvedTodayCount,
+      approvedTodayAmount,
+      releasedMonthCount,
+      releasedMonthAmount,
+      allDisbursements,
+    ] = await Promise.all([
+      prisma.disbursement.count({
+        where: { ...baseWhere, status: { in: ["PENDING", "APPROVED"] } },
+      }),
+      prisma.disbursement.aggregate({
+        where: { ...baseWhere, status: { in: ["PENDING", "APPROVED"] } },
+        _sum: { amount: true },
+      }),
+      prisma.disbursement.count({
+        where: { ...baseWhere, status: "APPROVED", approvedAt: { gte: startOfDay } },
+      }),
+      prisma.disbursement.aggregate({
+        where: { ...baseWhere, status: "APPROVED", approvedAt: { gte: startOfDay } },
+        _sum: { amount: true },
+      }),
+      prisma.disbursement.count({
+        where: { ...baseWhere, status: "COMPLETED", processedAt: { gte: startOfMonth } },
+      }),
+      prisma.disbursement.aggregate({
+        where: { ...baseWhere, status: "COMPLETED", processedAt: { gte: startOfMonth } },
+        _sum: { amount: true },
+      }),
+      prisma.disbursement.findMany({
+        where: { ...baseWhere, status: "COMPLETED", processedAt: { not: null }, approvedAt: { not: null } },
+        select: { approvedAt: true, processedAt: true },
+        take: 100,
+      }),
+    ]);
+
+    let avgProcessingDays = 0;
+    if (allDisbursements.length > 0) {
+      const totalDays = allDisbursements.reduce((sum, d) => {
+        if (d.approvedAt && d.processedAt) {
+          return sum + (d.processedAt.getTime() - d.approvedAt.getTime()) / (1000 * 60 * 60 * 24);
+        }
+        return sum;
+      }, 0);
+      avgProcessingDays = Math.round((totalDays / allDisbursements.length) * 10) / 10;
+    }
+
+    const layerBreakdown = await prisma.disbursement.groupBy({
+      by: ["trancheNumber"],
+      where: { ...baseWhere, status: "COMPLETED" },
+      _count: true,
+      _sum: { amount: true },
+    });
+
+    const last6Months = await Promise.all(
+      Array.from({ length: 6 }, (_, i) => {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const endDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+        return prisma.disbursement.aggregate({
+          where: {
+            ...baseWhere,
+            status: "COMPLETED",
+            processedAt: { gte: date, lte: endDate },
+          },
+          _sum: { amount: true },
+          _count: true,
+        }).then((r) => ({
+          month: date.toLocaleString("default", { month: "short", year: "2-digit" }),
+          amount: Number(r._sum.amount || 0),
+          count: r._count,
+        }));
+      })
+    );
+
+    return {
+      pendingApproval: { count: pendingCount, amount: Number(pendingAmount._sum.amount || 0) },
+      approvedToday: { count: approvedTodayCount, amount: Number(approvedTodayAmount._sum.amount || 0) },
+      releasedThisMonth: { count: releasedMonthCount, amount: Number(releasedMonthAmount._sum.amount || 0) },
+      avgProcessingDays,
+      layerBreakdown: layerBreakdown.map((l) => ({
+        layer: l.trancheNumber,
+        count: l._count,
+        amount: Number(l._sum.amount || 0),
+      })),
+      monthlyTrend: last6Months.reverse(),
+    };
   }
 
   static async getByLoan(loanId: string) {
@@ -146,17 +346,136 @@ export class DisbursementService {
     return updated;
   }
 
-  static async reject(id: string, reason: string) {
-    const d = await prisma.disbursement.findUnique({ where: { id } });
+  static async reject(id: string, reason: string, reviewerId: string) {
+    const d = await prisma.disbursement.findUnique({
+      where: { id },
+      include: { loan: { include: { borrower: true } } },
+    });
     if (!d) throw ApiError.notFound("Disbursement not found");
     if (!["PENDING", "APPROVED"].includes(d.status)) {
       throw ApiError.badRequest("Can only reject pending or approved disbursements");
     }
 
-    return prisma.disbursement.update({
+    const updated = await prisma.disbursement.update({
       where: { id },
       data: { status: "FAILED", failureReason: reason },
     });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: reviewerId,
+        action: "DISBURSEMENT_REJECTED",
+        resource: "DISBURSEMENT",
+        resourceId: id,
+        details: { reason, trancheNumber: d.trancheNumber, amount: Number(d.amount) },
+      },
+    });
+
+    logger.info("Disbursement rejected", { id, reason });
+
+    return updated;
+  }
+
+  static async retry(id: string, reviewerId: string) {
+    const d = await prisma.disbursement.findUnique({ where: { id } });
+    if (!d) throw ApiError.notFound("Disbursement not found");
+    if (d.status !== "FAILED") throw ApiError.badRequest("Can only retry failed disbursements");
+
+    const updated = await prisma.disbursement.update({
+      where: { id },
+      data: { status: "APPROVED", failureReason: null },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: reviewerId,
+        action: "DISBURSEMENT_RETRY",
+        resource: "DISBURSEMENT",
+        resourceId: id,
+        details: { trancheNumber: d.trancheNumber },
+      },
+    });
+
+    logger.info("Disbursement retry initiated", { id });
+
+    return updated;
+  }
+
+  static async manualRelease(id: string, reviewerId: string, paymentRef: string, notes: string) {
+    const d = await prisma.disbursement.findUnique({ where: { id } });
+    if (!d) throw ApiError.notFound("Disbursement not found");
+    if (!["APPROVED", "FAILED"].includes(d.status)) {
+      throw ApiError.badRequest("Can only manually release approved or failed disbursements");
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const updated = await tx.disbursement.update({
+        where: { id },
+        data: {
+          status: "COMPLETED",
+          paymentRef,
+          processedAt: new Date(),
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          reference: paymentRef,
+          type: "DISBURSEMENT",
+          status: "SUCCESS",
+          amount: d.amount,
+          loanId: d.loanId,
+          processedAt: new Date(),
+        },
+      });
+
+      if (d.trancheNumber === 1) {
+        await tx.borrowerLoan.update({
+          where: { id: d.loanId },
+          data: { status: "ACTIVE", startDate: new Date() },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: reviewerId,
+          action: "DISBURSEMENT_MANUAL_RELEASE",
+          resource: "DISBURSEMENT",
+          resourceId: id,
+          details: { paymentRef, notes, trancheNumber: d.trancheNumber, amount: Number(d.amount) },
+        },
+      });
+
+      return updated;
+    });
+
+    logger.info("Disbursement manually released", { id, paymentRef });
+
+    return result;
+  }
+
+  static async bulkApprove(ids: string[], approvedBy: string) {
+    const results = await Promise.allSettled(
+      ids.map((id) => this.approve(id, approvedBy))
+    );
+
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    const failed = results.filter((r) => r.status === "rejected").length;
+
+    logger.info("Bulk disbursement approval", { total: ids.length, succeeded, failed });
+
+    return { succeeded, failed, total: ids.length };
+  }
+
+  static async bulkReject(ids: string[], reason: string, reviewerId: string) {
+    const results = await Promise.allSettled(
+      ids.map((id) => this.reject(id, reason, reviewerId))
+    );
+
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    const failed = results.filter((r) => r.status === "rejected").length;
+
+    return { succeeded, failed, total: ids.length };
   }
 
   static async getTrancheStatus(loanId: string) {

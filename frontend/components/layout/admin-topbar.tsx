@@ -2,6 +2,7 @@
 
 import { Menu, Search, Moon, Sun, Bell } from "lucide-react";
 import { useTheme } from "next-themes";
+import { UserMenu } from "./user-menu";
 
 interface AdminTopbarProps {
   sidebarOpen: boolean;
@@ -48,6 +49,8 @@ export function AdminTopbar({ sidebarOpen, setSidebarOpen }: AdminTopbarProps) {
             3
           </span>
         </div>
+
+        <UserMenu settingsHref="/platform-settings" />
       </div>
     </header>
   );

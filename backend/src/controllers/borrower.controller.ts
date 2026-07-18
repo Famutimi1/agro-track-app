@@ -41,3 +41,50 @@ export const getMyProfile = asyncHandler(async (req: Request, res: Response) => 
   const profile = await BorrowerService.getMyProfile(req.user.sub);
   res.json({ success: true, data: profile });
 });
+
+export const getBorrowerLoans = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user?.lenderId) throw ApiError.forbidden("Lender access required");
+  const loans = await BorrowerService.getLoans(req.params.id, req.user.lenderId);
+  res.json({ success: true, data: loans });
+});
+
+export const getBorrowerFarmReports = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user?.lenderId) throw ApiError.forbidden("Lender access required");
+  const reports = await BorrowerService.getFarmReports(req.params.id, req.user.lenderId);
+  res.json({ success: true, data: reports });
+});
+
+export const getBorrowerFarmScore = asyncHandler(async (req: Request, res: Response) => {
+  const farmScore = await BorrowerService.getFarmScore(req.params.id);
+  res.json({ success: true, data: farmScore });
+});
+
+export const getBorrowerDocuments = asyncHandler(async (req: Request, res: Response) => {
+  const documents = await BorrowerService.getDocuments(req.params.id);
+  res.json({ success: true, data: documents });
+});
+
+export const getBorrowerActivity = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user?.lenderId) throw ApiError.forbidden("Lender access required");
+  const activity = await BorrowerService.getActivity(req.params.id, req.user.lenderId);
+  res.json({ success: true, data: activity });
+});
+
+export const flagBorrower = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user?.lenderId) throw ApiError.forbidden("Lender access required");
+  const result = await BorrowerService.flag(req.params.id, req.user.sub, req.body);
+  res.json({ success: true, data: result });
+});
+
+export const blacklistBorrower = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user?.lenderId) throw ApiError.forbidden("Lender access required");
+  const result = await BorrowerService.blacklist(req.params.id, req.user.sub, req.body);
+  res.json({ success: true, data: result });
+});
+
+export const unblacklistBorrower = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user?.lenderId) throw ApiError.forbidden("Lender access required");
+  const { reason } = req.body;
+  const result = await BorrowerService.unblacklist(req.params.id, req.user.sub, reason);
+  res.json({ success: true, data: result });
+});

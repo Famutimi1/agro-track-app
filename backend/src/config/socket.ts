@@ -73,6 +73,19 @@ export function initializeSocket(httpServer: HttpServer): Server {
     socket.on("leave:conversation", (conversationId: string) => {
       socket.leave(`conversation:${conversationId}`);
     });
+
+    // Generic room join/leave used by frontend hooks (e.g. conversation:*, lender:*, borrower:*, agent:*)
+    socket.on("join", (room: string) => {
+      if (typeof room === "string" && room.length > 0) {
+        socket.join(room);
+      }
+    });
+
+    socket.on("leave", (room: string) => {
+      if (typeof room === "string" && room.length > 0) {
+        socket.leave(room);
+      }
+    });
   });
 
   logger.info("Socket.IO initialized");

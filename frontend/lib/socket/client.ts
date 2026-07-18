@@ -1,6 +1,7 @@
 import { io, Socket } from "socket.io-client";
 import { useRealtimeStore, useNotificationsStore } from "../stores";
 import { Notification } from "../api";
+import { Message } from "../api/messages";
 
 let socket: Socket | null = null;
 
@@ -15,6 +16,7 @@ export interface SocketEvents {
   "farm-report:verified": (data: { reportId: string; borrowerId: string }) => void;
   "farm-score:updated": (data: { borrowerId: string; score: number; tier: string }) => void;
   "field-visit:assigned": (data: { visitId: string; agentId: string }) => void;
+  "message:new": (data: Message) => void;
 }
 
 export function getSocket(): Socket | null {

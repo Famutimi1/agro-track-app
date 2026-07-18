@@ -109,7 +109,7 @@ export default function SignupPage() {
   };
 
   const handleGoToDashboard = () => {
-    router.push("/dashboard");
+    router.push("/lender/dashboard");
   };
 
   return (

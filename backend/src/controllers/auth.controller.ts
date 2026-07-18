@@ -229,6 +229,114 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
   res.json({ success: true, data: user });
 });
 
+// Update profile — works for all roles. Updates user fields plus role-specific
+// borrower profile or lender organization fields when provided.
+export const updateProfile = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.sub;
+  const {
+    firstName,
+    lastName,
+    phone,
+    avatarUrl,
+    state,
+    lga,
+    address,
+    farmSizeHa,
+    primaryCrop,
+    bankName,
+    bankAccount,
+    language,
+    organizationName,
+    organizationPhone,
+    organizationAddress,
+  } = req.body;
+
+  const existing = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { borrowerProfile: true },
+  });
+  if (!existing) throw ApiError.notFound("User not found");
+
+  // Build the user-level update from provided fields only.
+  const userData: Record<string, unknown> = {};
+  if (firstName !== undefined) userData.firstName = firstName;
+  if (lastName !== undefined) userData.lastName = lastName;
+  if (phone !== undefined) userData.phone = phone;
+  if (avatarUrl !== undefined) userData.avatarUrl = avatarUrl;
+
+  // Borrower-specific profile fields.
+  const borrowerData: Record<string, unknown> = {};
+  if (state !== undefined) borrowerData.state = state;
+  if (lga !== undefined) borrowerData.lga = lga;
+  if (address !== undefined) borrowerData.address = address;
+  if (farmSizeHa !== undefined) borrowerData.farmSizeHa = farmSizeHa;
+  if (primaryCrop !== undefined) borrowerData.primaryCrop = primaryCrop;
+  if (bankName !== undefined) borrowerData.bankName = bankName;
+  if (bankAccount !== undefined) borrowerData.bankAccount = bankAccount;
+  if (language !== undefined) borrowerData.language = language;
+
+  // Lender organization fields (only applied if the user belongs to an org).
+  const orgData: Record<string, unknown> = {};
+  if (organizationName !== undefined) orgData.name = organizationName;
+  if (organizationPhone !== undefined) orgData.phone = organizationPhone;
+  if (organizationAddress !== undefined) orgData.address = organizationAddress;
+
+  await prisma.$transaction(async (tx) => {
+    if (Object.keys(userData).length > 0) {
+      await tx.user.update({ where: { id: userId }, data: userData });
+    }
+
+    if (Object.keys(borrowerData).length > 0 && existing.borrowerProfile) {
+      await tx.borrowerProfile.update({
+        where: { userId },
+        data: borrowerData,
+      });
+    }
+
+    if (Object.keys(orgData).length > 0 && existing.lenderOrgId) {
+      await tx.lenderOrganization.update({
+        where: { id: existing.lenderOrgId },
+        data: orgData,
+      });
+    }
+  });
+
+  const updated = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+      role: true,
+      avatarUrl: true,
+      emailVerified: true,
+      phoneVerified: true,
+      twoFactorEnabled: true,
+      createdAt: true,
+      lenderOrg: { select: { id: true, name: true, plan: true, phone: true, address: true } },
+      borrowerProfile: {
+        select: {
+          farmerId: true,
+          farmScore: true,
+          farmScoreTier: true,
+          state: true,
+          lga: true,
+          address: true,
+          farmSizeHa: true,
+          primaryCrop: true,
+          bankName: true,
+          bankAccount: true,
+          language: true,
+        },
+      },
+    },
+  });
+
+  res.json({ success: true, data: updated, message: "Profile updated" });
+});
+
 // OTP endpoints
 export const sendOtp = asyncHandler(async (req: Request, res: Response) => {
   const { phone, purpose } = req.body;

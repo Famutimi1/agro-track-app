@@ -10,7 +10,7 @@ import {
   subscribeToEvent,
   SocketEvents,
 } from "./client";
-import { loanKeys, applicationKeys, farmReportKeys, farmScoreKeys, fieldVisitKeys } from "../hooks";
+import { loanKeys, applicationKeys, farmReportKeys, farmScoreKeys, fieldAgentKeys } from "../hooks";
 
 export function useSocket() {
   const { isConnected, connectionError } = useRealtimeStore();
@@ -103,9 +103,9 @@ export function useRealtimeInvalidation() {
   );
 
   const handleFieldVisitAssigned = useCallback(
-    (data: { visitId: string }) => {
-      queryClient.invalidateQueries({ queryKey: fieldVisitKeys.detail(data.visitId) });
-      queryClient.invalidateQueries({ queryKey: fieldVisitKeys.lists() });
+    (data: { agentId: string }) => {
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.tasks(data.agentId) });
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.lists() });
     },
     [queryClient]
   );

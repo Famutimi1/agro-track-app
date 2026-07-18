@@ -29,7 +29,7 @@ export const repaymentKeys = {
 export function useLoans(query: LoansQuery = {}) {
   return useQuery({
     queryKey: loanKeys.list(query),
-    queryFn: () => loansApi.listForLender(query),
+    queryFn: () => loansApi.list(query),
   });
 }
 
@@ -121,5 +121,76 @@ export function useRecordRepayment() {
       queryClient.invalidateQueries({ queryKey: repaymentKeys.mine() });
       queryClient.invalidateQueries({ queryKey: loanKeys.all });
     },
+  });
+}
+
+function invalidateRepaymentQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: repaymentKeys.mine() });
+  queryClient.invalidateQueries({ queryKey: loanKeys.all });
+}
+
+export function useInitiateCardPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => repaymentsApi.initiateCard(id),
+    onSuccess: () => invalidateRepaymentQueries(queryClient),
+  });
+}
+
+export function useVerifyCardPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, reference }: { id: string; reference: string }) =>
+      repaymentsApi.verifyCard(id, reference),
+    onSuccess: () => invalidateRepaymentQueries(queryClient),
+  });
+}
+
+export function useVerifyCardPaymentByReference() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (reference: string) => repaymentsApi.verifyCardByReference(reference),
+    onSuccess: () => invalidateRepaymentQueries(queryClient),
+  });
+}
+
+export function useInitiateBankTransfer() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => repaymentsApi.initiateBankTransfer(id),
+    onSuccess: () => invalidateRepaymentQueries(queryClient),
+  });
+}
+
+export function useInitiateUssd() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => repaymentsApi.initiateUssd(id),
+    onSuccess: () => invalidateRepaymentQueries(queryClient),
+  });
+}
+
+export function useConfirmManualPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, method }: { id: string; method: "BANK_TRANSFER" | "USSD" }) =>
+      repaymentsApi.confirmManual(id, method),
+    onSuccess: () => invalidateRepaymentQueries(queryClient),
+  });
+}
+
+export function useDeclareInKindRepayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof repaymentsApi.declareInKind>[1] }) =>
+      repaymentsApi.declareInKind(id, data),
+    onSuccess: () => invalidateRepaymentQueries(queryClient),
   });
 }

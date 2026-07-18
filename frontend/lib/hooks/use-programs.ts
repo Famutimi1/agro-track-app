@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { programsApi, LoanProgram, ProgramsQuery } from "../api";
+import { programsApi, LoanProgram, ProgramsQuery, CreateProgramRequest } from "../api";
 
 export const programKeys = {
   all: ["programs"] as const,
@@ -47,7 +47,7 @@ export function useUpdateProgram() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<LoanProgram> }) =>
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateProgramRequest> }) =>
       programsApi.update(id, data),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: programKeys.lists() });

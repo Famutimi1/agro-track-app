@@ -7,6 +7,7 @@ import {
   registerBorrowerSchema,
   loginSchema,
   refreshTokenSchema,
+  updateProfileSchema,
 } from "../validators/auth.schema";
 import {
   registerLender,
@@ -15,6 +16,7 @@ import {
   refresh,
   logout,
   getMe,
+  updateProfile,
   sendOtp,
   verifyOtp,
   setup2FA,
@@ -38,6 +40,7 @@ authRouter.post("/logout", authenticate, logout);
 
 // Profile
 authRouter.get("/me", authenticate, getMe);
+authRouter.patch("/me", authenticate, validate(updateProfileSchema), updateProfile);
 
 // OTP
 authRouter.post("/otp/send", otpLimiter, sendOtp);

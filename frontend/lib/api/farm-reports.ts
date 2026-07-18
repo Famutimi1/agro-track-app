@@ -54,6 +54,15 @@ export const farmReportsApi = {
     return res.data.data;
   },
 
+  uploadPhotos: async (files: File[]) => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append("photos", file));
+    const res = await api.post<ApiResponse<{ urls: string[] }>>("/farm-reports/upload-photos", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data.data;
+  },
+
   listMine: async (query: FarmReportsQuery = {}) => {
     const res = await api.get<PaginatedResponse<FarmReport>>("/farm-reports/me", { params: query });
     return res.data;

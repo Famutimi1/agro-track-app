@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fieldAgentsApi, fieldVisitsApi, FieldAgentsQuery, FieldVisitsQuery } from "../api";
+import { fieldAgentsApi, FieldAgentsQuery } from "../api";
 
 export const fieldAgentKeys = {
   all: ["fieldAgents"] as const,
@@ -7,19 +7,11 @@ export const fieldAgentKeys = {
   list: (query: FieldAgentsQuery) => [...fieldAgentKeys.lists(), query] as const,
   details: () => [...fieldAgentKeys.all, "detail"] as const,
   detail: (id: string) => [...fieldAgentKeys.details(), id] as const,
-  me: () => [...fieldAgentKeys.all, "me"] as const,
-  myVisits: () => [...fieldAgentKeys.all, "myVisits"] as const,
+  stats: () => [...fieldAgentKeys.all, "stats"] as const,
+  tasks: (id: string) => [...fieldAgentKeys.all, "tasks", id] as const,
+  earnings: (id: string) => [...fieldAgentKeys.all, "earnings", id] as const,
 };
 
-export const fieldVisitKeys = {
-  all: ["fieldVisits"] as const,
-  lists: () => [...fieldVisitKeys.all, "list"] as const,
-  list: (query: FieldVisitsQuery) => [...fieldVisitKeys.lists(), query] as const,
-  details: () => [...fieldVisitKeys.all, "detail"] as const,
-  detail: (id: string) => [...fieldVisitKeys.details(), id] as const,
-};
-
-// Field Agent hooks
 export function useFieldAgents(query: FieldAgentsQuery = {}) {
   return useQuery({
     queryKey: fieldAgentKeys.list(query),
@@ -35,17 +27,26 @@ export function useFieldAgent(id: string) {
   });
 }
 
-export function useMyFieldAgentProfile() {
+export function useFieldAgentStats() {
   return useQuery({
-    queryKey: fieldAgentKeys.me(),
-    queryFn: () => fieldAgentsApi.getMyProfile(),
+    queryKey: fieldAgentKeys.stats(),
+    queryFn: () => fieldAgentsApi.getStats(),
   });
 }
 
-export function useMyFieldVisits(status?: string) {
+export function useFieldAgentTasks(id: string, query: { status?: string } = {}) {
   return useQuery({
-    queryKey: fieldAgentKeys.myVisits(),
-    queryFn: () => fieldAgentsApi.getMyVisits({ status }),
+    queryKey: fieldAgentKeys.tasks(id),
+    queryFn: () => fieldAgentsApi.getTasks(id, query),
+    enabled: !!id,
+  });
+}
+
+export function useFieldAgentEarnings(id: string) {
+  return useQuery({
+    queryKey: fieldAgentKeys.earnings(id),
+    queryFn: () => fieldAgentsApi.getEarnings(id),
+    enabled: !!id,
   });
 }
 
@@ -57,6 +58,7 @@ export function useCreateFieldAgent() {
       fieldAgentsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: fieldAgentKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.stats() });
     },
   });
 }
@@ -74,65 +76,67 @@ export function useUpdateFieldAgent() {
   });
 }
 
-export function useUpdateFieldAgentLocation() {
-  return useMutation({
-    mutationFn: ({ latitude, longitude }: { latitude: number; longitude: number }) =>
-      fieldAgentsApi.updateLocation(latitude, longitude),
-  });
-}
-
-// Field Visit hooks
-export function useFieldVisits(query: FieldVisitsQuery = {}) {
-  return useQuery({
-    queryKey: fieldVisitKeys.list(query),
-    queryFn: () => fieldVisitsApi.list(query),
-  });
-}
-
-export function useFieldVisit(id: string) {
-  return useQuery({
-    queryKey: fieldVisitKeys.detail(id),
-    queryFn: () => fieldVisitsApi.getById(id),
-    enabled: !!id,
-  });
-}
-
-export function useScheduleFieldVisit() {
+export function useActivateFieldAgent() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Parameters<typeof fieldVisitsApi.schedule>[0]) =>
-      fieldVisitsApi.schedule(data),
+    mutationFn: (id: string) => fieldAgentsApi.activate(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.stats() });
+    },
+  });
+}
+
+export function useDeactivateFieldAgent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      fieldAgentsApi.deactivate(id, reason),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.stats() });
+    },
+  });
+}
+
+export function useAssignTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof fieldAgentsApi.assignTask>[1] }) =>
+      fieldAgentsApi.assignTask(id, data),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.tasks(id) });
+    },
+  });
+}
+
+export function useApproveAgentPayout() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, amount }: { id: string; amount: number }) =>
+      fieldAgentsApi.approvePayout(id, amount),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.earnings(id) });
+    },
+  });
+}
+
+export function useRateVerification() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ visitId, rating, notes }: { visitId: string; rating: number; notes?: string }) =>
+      fieldAgentsApi.rateVerification(visitId, rating, notes),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: fieldVisitKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.myVisits() });
-    },
-  });
-}
-
-export function useStartFieldVisit() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, latitude, longitude }: { id: string; latitude: number; longitude: number }) =>
-      fieldVisitsApi.startVisit(id, latitude, longitude),
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: fieldVisitKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.myVisits() });
-    },
-  });
-}
-
-export function useCompleteFieldVisit() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof fieldVisitsApi.completeVisit>[1] }) =>
-      fieldVisitsApi.completeVisit(id, data),
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: fieldVisitKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: fieldVisitKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.myVisits() });
+      queryClient.invalidateQueries({ queryKey: fieldAgentKeys.lists() });
     },
   });
 }

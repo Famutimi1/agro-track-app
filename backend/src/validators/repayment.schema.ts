@@ -29,5 +29,34 @@ export const listRepaymentsSchema = z.object({
   }),
 });
 
+export const verifyCardSchema = z.object({
+  body: z.object({
+    reference: z.string({ required_error: "Reference is required" }).min(1),
+  }),
+  params: z.object({
+    id: z.string(),
+  }),
+});
+
+export const confirmManualSchema = z.object({
+  body: z.object({
+    method: z.enum(["BANK_TRANSFER", "USSD"], { required_error: "Method is required" }),
+  }),
+  params: z.object({
+    id: z.string(),
+  }),
+});
+
+export const inKindDeclarationSchema = z.object({
+  body: z.object({
+    produceType: z.string({ required_error: "Produce type is required" }).min(1).max(100),
+    quantityKg: z.number({ required_error: "Quantity is required" }).positive(),
+    deliveryLocation: z.string({ required_error: "Delivery location is required" }).min(1).max(300),
+  }),
+  params: z.object({
+    id: z.string(),
+  }),
+});
+
 export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
 export type ListRepaymentsInput = z.infer<typeof listRepaymentsSchema>;

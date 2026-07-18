@@ -18,6 +18,12 @@ export interface Program {
   trancheCount: number;
   collateralRequired: boolean;
   insuranceRequired: boolean;
+  requiredDocuments: string[];
+  totalFund?: number;
+  minAge?: number;
+  maxAge?: number;
+  gender: string;
+  cooperative: string;
   status: "DRAFT" | "ACTIVE" | "PAUSED" | "CLOSED";
   startDate?: string;
   endDate?: string;
@@ -30,7 +36,7 @@ export interface Program {
 export interface CreateProgramRequest {
   name: string;
   description: string;
-  type?: string;
+  type?: "INPUT_CREDIT" | "CASH_LOAN" | "EQUIPMENT_LEASE" | "INSURANCE";
   interestRate: number;
   maxAmount: number;
   minAmount: number;
@@ -40,10 +46,19 @@ export interface CreateProgramRequest {
   targetStates?: string[];
   maxBorrowers?: number;
   gracePeriodDays?: number;
-  disbursementType?: string;
+  disbursementType?: "FULL" | "TRANCHE";
   trancheCount?: number;
   collateralRequired?: boolean;
   insuranceRequired?: boolean;
+  requiredDocuments?: string[];
+  totalFund?: number;
+  minAge?: number;
+  maxAge?: number;
+  gender?: "ALL" | "FEMALE" | "MALE" | "YOUTH";
+  cooperative?: "OPTIONAL" | "REQUIRED" | "NOT_REQUIRED";
+  status?: "DRAFT" | "ACTIVE" | "PAUSED" | "CLOSED";
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface ProgramsQuery {
@@ -90,6 +105,42 @@ export const programsApi = {
     const res = await api.get<PaginatedResponse<Program>>("/programs/discover", { params: query });
     return res.data;
   },
+
+  getStats: async (id: string) => {
+    const res = await api.get<ApiResponse<ProgramStats>>(`/programs/${id}/stats`);
+    return res.data.data;
+  },
+
+  close: async (id: string, forceClose = false) => {
+    const res = await api.post<ApiResponse<Program>>(`/programs/${id}/close`, { forceClose });
+    return res.data.data;
+  },
+
+  duplicate: async (id: string) => {
+    const res = await api.post<ApiResponse<Program>>(`/programs/${id}/duplicate`);
+    return res.data.data;
+  },
 };
+
+export interface ProgramStats {
+  totalFund: number;
+  totalDisbursed: number;
+  totalRepaid: number;
+  remainingFund: number | null;
+  applicationsByStatus: {
+    total: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+  };
+  loansByStatus: {
+    total: number;
+    active: number;
+    completed: number;
+    defaulted: number;
+  };
+  avgLoanAmount: number;
+  repaymentRate: number;
+}
 
 export type LoanProgram = Program;

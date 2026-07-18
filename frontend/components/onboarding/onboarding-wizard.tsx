@@ -73,7 +73,7 @@ export function OnboardingWizard({ role, onComplete, onSkip }: OnboardingWizardP
           </ul>
         </div>
       ),
-      action: { label: "Go to Settings", href: "/lender-settings" },
+      action: { label: "Go to Settings", href: "/lender/settings" },
     },
     {
       id: "programs",
@@ -97,7 +97,7 @@ export function OnboardingWizard({ role, onComplete, onSkip }: OnboardingWizardP
           </div>
         </div>
       ),
-      action: { label: "Create Program", href: "/loan-programs" },
+      action: { label: "Create Program", href: "/lender/loan-programs" },
     },
     {
       id: "team",
@@ -125,7 +125,7 @@ export function OnboardingWizard({ role, onComplete, onSkip }: OnboardingWizardP
           </div>
         </div>
       ),
-      action: { label: "Invite Members", href: "/lender-settings/team" },
+      action: { label: "Invite Members", href: "/lender/settings/team" },
     },
     {
       id: "complete",
