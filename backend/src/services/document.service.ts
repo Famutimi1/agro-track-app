@@ -1,7 +1,7 @@
 import { DocumentType, VerificationStatus } from "@prisma/client";
 import { prisma } from "../config/prisma";
 import { ApiError } from "../utils/api-error";
-import { S3Service } from "./s3.service";
+import { CloudinaryService } from "./cloudinary.service";
 import { getPagination, paginatedResponse, PaginationQuery } from "../utils/pagination";
 
 export class DocumentService {
@@ -20,7 +20,7 @@ export class DocumentService {
       ? `applications/${data.applicationId}`
       : `users/${data.userId}`;
 
-    const { key, url } = await S3Service.uploadFile(
+    const { key, url } = await CloudinaryService.uploadFile(
       data.buffer,
       data.mimeType,
       folder,
@@ -36,52 +36,6 @@ export class DocumentService {
         fileName: data.originalName,
         fileUrl: url,
         fileSize: data.buffer.length,
-        mimeType: data.mimeType,
-        status: "PENDING",
-      },
-    });
-  }
-
-  static async getSignedUploadUrl(data: {
-    type: DocumentType;
-    mimeType: string;
-    borrowerId?: string;
-    applicationId?: string;
-  }) {
-    const folder = data.borrowerId
-      ? `borrowers/${data.borrowerId}`
-      : data.applicationId
-      ? `applications/${data.applicationId}`
-      : "uploads";
-
-    const { uploadUrl, key } = await S3Service.getSignedUploadUrl(folder, data.mimeType);
-
-    return { uploadUrl, key };
-  }
-
-  static async confirmUpload(data: {
-    key: string;
-    type: DocumentType;
-    fileName: string;
-    fileSize: number;
-    mimeType: string;
-    userId?: string;
-    borrowerId?: string;
-    applicationId?: string;
-  }) {
-    const bucket = process.env.AWS_S3_BUCKET;
-    const region = process.env.AWS_REGION || "eu-west-1";
-    const fileUrl = `https://${bucket}.s3.${region}.amazonaws.com/${data.key}`;
-
-    return prisma.document.create({
-      data: {
-        userId: data.userId,
-        borrowerId: data.borrowerId,
-        applicationId: data.applicationId,
-        type: data.type,
-        fileName: data.fileName,
-        fileUrl,
-        fileSize: data.fileSize,
         mimeType: data.mimeType,
         status: "PENDING",
       },
@@ -138,23 +92,13 @@ export class DocumentService {
     const doc = await prisma.document.findUnique({ where: { id } });
     if (!doc) throw ApiError.notFound("Document not found");
 
-    // Extract key from URL
-    const urlParts = doc.fileUrl.split(".amazonaws.com/");
-    if (urlParts.length === 2) {
-      await S3Service.deleteFile(urlParts[1]);
+    // Extract the Cloudinary public_id from the delivery URL.
+    const parsed = CloudinaryService.parseUrl(doc.fileUrl);
+    if (parsed) {
+      await CloudinaryService.deleteFile(parsed.publicId, parsed.resourceType);
     }
 
     return prisma.document.delete({ where: { id } });
-  }
-
-  static async getSignedDownloadUrl(id: string): Promise<string> {
-    const doc = await prisma.document.findUnique({ where: { id } });
-    if (!doc) throw ApiError.notFound("Document not found");
-
-    const urlParts = doc.fileUrl.split(".amazonaws.com/");
-    if (urlParts.length !== 2) throw ApiError.internal("Invalid document URL");
-
-    return S3Service.getSignedDownloadUrl(urlParts[1]);
   }
 
   static async getPendingForLender(lenderOrgId: string, query: PaginationQuery) {

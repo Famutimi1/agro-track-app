@@ -393,10 +393,10 @@ model BorrowerLoan {
   disbursements Disbursement[]
   repayments    Repayment[]
 
+  @@unique([applicationId])
   @@index([borrowerId])
   @@index([programId])
   @@index([status])
-  @@index([applicationId])
 }
 
 // ─── DISBURSEMENTS & REPAYMENTS ──────────────────────────────────────────────
@@ -569,8 +569,19 @@ model Message {
   deliveredAt    DateTime?
   readAt         DateTime?
   createdAt      DateTime      @default(now())
+  // Monotonic per-conversation sequence for stable ordering (immune to
+  // createdAt ties / clock skew) and reconnect catch-up ("give me > lastSeq").
+  seq            BigInt        @default(0)
+  // Client-supplied idempotency key: a retried send with the same clientId
+  // returns the existing row instead of inserting a duplicate.
+  clientId       String?
 
+  @@unique([conversationId, clientId])
+  @@index([conversationId, seq])
   @@index([conversationId])
+  // Supports the unread group-by in getConversations (conversationId + read +
+  // senderId filter) so it stays index-only as message volume grows.
+  @@index([conversationId, read, senderId])
 }
 
 enum MessageChannel {

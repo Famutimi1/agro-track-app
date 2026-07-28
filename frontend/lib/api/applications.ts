@@ -165,6 +165,11 @@ export const applicationsApi = {
     return res.data;
   },
 
+  update: async (id: string, data: { amount?: number; purpose?: string }) => {
+    const res = await api.patch<ApiResponse<Application>>(`/applications/${id}`, data);
+    return res.data.data;
+  },
+
   submit: async (id: string) => {
     const res = await api.patch<ApiResponse<Application>>(`/applications/${id}/submit`);
     return res.data.data;

@@ -10,5 +10,4 @@ export * from "./use-field-agents";
 export * from "./use-cooperatives";
 export * from "./use-notifications";
 export * from "./use-reports";
-export * from "./use-documents";
 export * from "./use-pdf-export";

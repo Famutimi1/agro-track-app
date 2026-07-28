@@ -61,6 +61,20 @@ export function useCreateApplication() {
   });
 }
 
+export function useUpdateApplication() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { amount?: number; purpose?: string } }) =>
+      applicationsApi.update(id, data),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: applicationKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: applicationKeys.mine() });
+      queryClient.invalidateQueries({ queryKey: applicationKeys.detail(id) });
+    },
+  });
+}
+
 export function useSubmitApplication() {
   const queryClient = useQueryClient();
 

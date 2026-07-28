@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, ArrowRight } from "lucide-react";
-import { useTheme } from "next-themes";
 import { PublicNav } from "@/components/layout/public-nav";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
@@ -97,8 +96,6 @@ const faq = [
 ];
 
 export default function PricingPage() {
-  const { resolvedTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
   const [annual, setAnnual] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -107,14 +104,7 @@ export default function PricingPage() {
       <PublicNav />
 
       {/* Hero */}
-      <section
-        className="pt-[68px] pb-24 px-6 text-center"
-        style={{
-          background: dark
-            ? "linear-gradient(160deg,#0a1a0a 0%,#111827 100%)"
-            : "linear-gradient(160deg,#042007 0%,#1B5E20 100%)",
-        }}
-      >
+      <section className="pt-[68px] pb-24 px-6 text-center bg-[linear-gradient(160deg,#042007_0%,#1B5E20_100%)] dark:bg-[linear-gradient(160deg,#0a1a0a_0%,#111827_100%)]">
         <div className="max-w-[800px] mx-auto pt-20">
           <h1 className="text-[clamp(32px,5vw,56px)] font-black text-white leading-[1.1] tracking-tight mb-5">
             Transparent pricing.{" "}
@@ -153,17 +143,9 @@ export default function PricingPage() {
               key={plan.name}
               className={`relative rounded-3xl p-7 ${
                 plan.hot
-                  ? "shadow-xl shadow-green-600/15 scale-[1.02] z-10"
-                  : ""
+                  ? "shadow-xl shadow-green-600/15 scale-[1.02] z-10 border-none bg-[linear-gradient(160deg,#1B5E20,#2E7D32)]"
+                  : "border border-[var(--border)] bg-white dark:bg-gray-800"
               }`}
-              style={{
-                background: plan.hot
-                  ? "linear-gradient(160deg,#1B5E20,#2E7D32)"
-                  : dark
-                  ? "#1f2937"
-                  : "#fff",
-                border: plan.hot ? "none" : "1px solid var(--border)",
-              }}
             >
               {plan.hot && (
                 <>
@@ -231,16 +213,13 @@ export default function PricingPage() {
                 {plan.features.map(({ f, ok }) => (
                   <div key={f} className="flex items-center gap-2">
                     <div
-                      className="w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{
-                        background: ok
+                      className={`w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0 ${
+                        ok
                           ? plan.hot
-                            ? "rgba(255,255,255,0.2)"
-                            : "#dcfce7"
-                          : dark
-                          ? "#374151"
-                          : "#f3f4f6",
-                      }}
+                            ? "bg-white/20"
+                            : "bg-green-100"
+                          : "bg-gray-100 dark:bg-gray-700"
+                      }`}
                     >
                       {ok ? (
                         <Check

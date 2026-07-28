@@ -97,6 +97,12 @@ api.interceptors.response.use(
         setStoredToken("accessToken", accessToken);
         setStoredToken("refreshToken", newRefreshToken);
 
+        // Re-authenticate the WebSocket with the fresh token so its JWT claims
+        // don't go stale (dynamic import avoids a client↔socket import cycle).
+        import("../socket/client")
+          .then((m) => m.reauthenticateSocket())
+          .catch(() => {});
+
         processQueue(null, accessToken);
 
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;

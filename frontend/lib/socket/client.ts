@@ -17,6 +17,8 @@ export interface SocketEvents {
   "farm-score:updated": (data: { borrowerId: string; score: number; tier: string }) => void;
   "field-visit:assigned": (data: { visitId: string; agentId: string }) => void;
   "message:new": (data: Message) => void;
+  "message:delivered": (data: { conversationId: string; messageId: string }) => void;
+  "message:read": (data: { conversationId: string; messageIds: string[]; readerId: string }) => void;
 }
 
 export function getSocket(): Socket | null {
@@ -94,6 +96,19 @@ export function disconnectSocket(): void {
   }
 }
 
+// Re-authenticate the live socket after a token refresh. A long-lived socket
+// otherwise keeps the JWT claims it connected with, so a refreshed role/lender
+// (or an expired original token) would go stale. We swap the auth token and
+// force a reconnect; the "connect" handler re-joins all tracked rooms. No-op if
+// no socket exists yet (next initSocket picks up the new token from storage).
+export function reauthenticateSocket(): void {
+  if (!socket) return;
+  const token = localStorage.getItem("accessToken");
+  if (!token) return;
+  socket.auth = { token };
+  socket.disconnect().connect();
+}
+
 export function joinRoom(room: string): void {
   if (socket?.connected) {
     socket.emit("join", room);
@@ -106,6 +121,35 @@ export function leaveRoom(room: string): void {
     socket.emit("leave", room);
     useRealtimeStore.getState().removeRoom(room);
   }
+}
+
+// ── Phase 3 client→server emits ──────────────────────────────────────────────
+
+// Acknowledge receipt of a message so the server marks it DELIVERED.
+export function ackMessageDelivered(messageId: string): void {
+  socket?.emit("message:ack", { messageId });
+}
+
+// Tell the server this conversation has been read (pushes a live read receipt).
+export function emitConversationRead(conversationId: string): void {
+  socket?.emit("message:read", { conversationId });
+}
+
+// Reconnect catch-up: ask the server for any messages newer than lastSeq.
+// Resolves with the missed messages via the Socket.IO ack callback.
+export function syncConversation(
+  conversationId: string,
+  lastSeq: number
+): Promise<Message[]> {
+  return new Promise((resolve) => {
+    if (!socket?.connected) {
+      resolve([]);
+      return;
+    }
+    socket.emit("conversation:sync", { conversationId, lastSeq }, (messages: Message[]) => {
+      resolve(Array.isArray(messages) ? messages : []);
+    });
+  });
 }
 
 export function subscribeToEvent<K extends keyof SocketEvents>(

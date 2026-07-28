@@ -2,22 +2,18 @@
 
 import Link from "next/link";
 import { Leaf, Check, ArrowRight, Star } from "lucide-react";
-import { useTheme } from "next-themes";
 import { PublicNav } from "@/components/layout/public-nav";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
 import { stats, features, steps, testimonials, pricing, markets } from "@/lib/data/landing-data";
 
 export default function LandingPage() {
-  const { resolvedTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
-
   return (
     <div className="bg-white dark:bg-gray-900 text-[var(--text)] transition-colors duration-300">
       <PublicNav />
 
       {/* Hero */}
-      <section className="min-h-screen flex items-center relative overflow-hidden pt-[68px]" style={{ background: dark ? "linear-gradient(160deg,#0a1a0a 0%,#0f1923 40%,#111827 100%)" : "linear-gradient(160deg,#042007 0%,#0a3010 50%,#1B5E20 100%)" }}>
+      <section className="min-h-screen flex items-center relative overflow-hidden pt-[68px] bg-[linear-gradient(160deg,#042007_0%,#0a3010_50%,#1B5E20_100%)] dark:bg-[linear-gradient(160deg,#0a1a0a_0%,#0f1923_40%,#111827_100%)]">
         <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
         <div className="max-w-[1200px] mx-auto w-full px-6 py-20 relative grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-14 items-center">
           <div>
@@ -84,8 +80,8 @@ export default function LandingPage() {
             {features.map((f) => (
               <div
                 key={f.title}
-                className="rounded-2xl p-6 border border-[var(--border)] transition-transform hover:-translate-y-1"
-                style={{ background: dark ? f.darkBg : f.bg }}
+                className="rounded-2xl p-6 border border-[var(--border)] transition-transform hover:-translate-y-1 bg-[var(--card-bg)] dark:bg-[var(--card-bg-dark)]"
+                style={{ ["--card-bg" as string]: f.bg, ["--card-bg-dark" as string]: f.darkBg }}
               >
                 <span className="text-3xl mb-4 block">{f.icon}</span>
                 <h3 className="text-base font-bold mb-2" style={{ color: f.color }}>

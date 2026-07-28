@@ -12,6 +12,12 @@ export interface Message {
   read: boolean;
   channel: MessageChannel;
   status: MessageStatus;
+  // Per-conversation monotonic sequence. Serialized as a string because it is a
+  // BigInt server-side and exceeds JS safe-integer range in theory. Order and
+  // dedup messages by this, not createdAt.
+  seq?: string;
+  // Client-generated idempotency/dedup key echoed back by the server.
+  clientId?: string;
   deliveredAt?: string;
   readAt?: string;
   createdAt: string;
@@ -135,10 +141,16 @@ export const messagesApi = {
     return res.data;
   },
 
-  sendMessage: async (conversationId: string, content: string, channel: MessageChannel = "IN_APP") => {
+  sendMessage: async (
+    conversationId: string,
+    content: string,
+    channel: MessageChannel = "IN_APP",
+    clientId?: string
+  ) => {
     const res = await api.post<ApiResponse<Message>>(`/messages/conversations/${conversationId}/messages`, {
       content,
       channel,
+      clientId,
     });
     return res.data.data;
   },

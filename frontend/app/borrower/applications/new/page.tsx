@@ -12,7 +12,9 @@ import {
   useDiscoverPrograms,
   useMyBorrowerProfile,
   useCreateApplication,
+  useUpdateApplication,
   useSubmitApplication,
+  useApplication,
   useApplicationEligibility,
   useUploadApplicationDocuments,
 } from "@/lib/hooks";
@@ -38,28 +40,34 @@ export default function NewApplicationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedProgramId = searchParams.get("programId");
+  const draftId = searchParams.get("draftId");
+  // Arriving from discover or resuming a draft locks the program in — skip step 1.
+  const programLocked = !!draftId || !!preselectedProgramId;
 
   const { data: profile } = useMyBorrowerProfile();
   const { data: programsData, isLoading: programsLoading } = useDiscoverPrograms();
+  const { data: draft, isLoading: draftLoading } = useApplication(draftId || "");
   const programs = programsData?.data || [];
   const rankedPrograms = [...programs]
     .map((p) => ({ program: p, match: computeProgramMatch(p, profile) }))
     .sort((a, b) => b.match - a.match);
 
   const createApplication = useCreateApplication();
+  const updateApplication = useUpdateApplication();
   const submitApplication = useSubmitApplication();
   const uploadDocuments = useUploadApplicationDocuments();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [docError, setDocError] = useState<string | null>(null);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
 
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(programLocked ? 2 : 1);
   const [formData, setFormData] = useState({
     programId: preselectedProgramId || "",
     amount: "",
     purpose: "",
     agreedToTerms: false,
   });
+  const [draftPrefilled, setDraftPrefilled] = useState(false);
 
   // Selected document files keyed by document type
   const [documents, setDocuments] = useState<Record<string, File | null>>({});
@@ -71,6 +79,19 @@ export default function NewApplicationPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preselectedProgramId]);
 
+  // Prefill the wizard from an existing draft when resuming (?draftId=...)
+  useEffect(() => {
+    if (draft && !draftPrefilled) {
+      setFormData((f) => ({
+        ...f,
+        programId: draft.programId,
+        amount: String(draft.amount ?? ""),
+        purpose: draft.purpose ?? "",
+      }));
+      setDraftPrefilled(true);
+    }
+  }, [draft, draftPrefilled]);
+
   const selectedProgram = programs.find(p => p.id === formData.programId);
   const { data: eligibility, isLoading: eligibilityLoading } = useApplicationEligibility(
     formData.programId,
@@ -81,8 +102,10 @@ export default function NewApplicationPage() {
     if (currentStep < 4) setCurrentStep(currentStep + 1);
   };
 
+  const minStep = programLocked ? 2 : 1;
+
   const handleBack = () => {
-    if (currentStep > 1) setCurrentStep(currentStep - 1);
+    if (currentStep > minStep) setCurrentStep(currentStep - 1);
   };
 
   const handleSelectDocument = (type: string, file: File | null) => {
@@ -98,28 +121,38 @@ export default function NewApplicationPage() {
     if (!selectedProgram) return;
     setSubmitError(null);
     try {
-      const application = await createApplication.mutateAsync({
-        programId: selectedProgram.id,
-        amount: Number(formData.amount),
-        purpose: formData.purpose,
-      });
+      // Resuming a draft reuses the existing application; a fresh flow creates one.
+      const applicationId = draftId
+        ? (await updateApplication.mutateAsync({
+            id: draftId,
+            data: { amount: Number(formData.amount), purpose: formData.purpose },
+          })).id
+        : (await createApplication.mutateAsync({
+            programId: selectedProgram.id,
+            amount: Number(formData.amount),
+            purpose: formData.purpose,
+          })).id;
 
       // Upload any selected documents before submitting the application
       for (const doc of DOCUMENT_TYPES) {
         const file = documents[doc.type];
         if (file) {
-          await uploadDocuments.mutateAsync({ id: application.id, files: [file], type: doc.type });
+          await uploadDocuments.mutateAsync({ id: applicationId, files: [file], type: doc.type });
         }
       }
 
-      await submitApplication.mutateAsync(application.id);
-      setSubmittedId(application.id);
+      await submitApplication.mutateAsync(applicationId);
+      setSubmittedId(applicationId);
     } catch (err: any) {
       setSubmitError(err?.response?.data?.message || "Failed to submit application. Please try again.");
     }
   };
 
-  const isSubmitting = createApplication.isPending || submitApplication.isPending || uploadDocuments.isPending;
+  const isSubmitting =
+    createApplication.isPending ||
+    updateApplication.isPending ||
+    submitApplication.isPending ||
+    uploadDocuments.isPending;
 
   const isStepValid = () => {
     switch (currentStep) {
@@ -135,6 +168,42 @@ export default function NewApplicationPage() {
         return false;
     }
   };
+
+  // While resuming a draft, wait for it to load before rendering the wizard.
+  if (draftId && draftLoading && !draftPrefilled) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <p className="text-sm text-[var(--muted)] text-center py-12">Loading your draft…</p>
+      </div>
+    );
+  }
+
+  // A draft's program may no longer be open for applications (inactive/closed),
+  // in which case it won't appear in the discover list and can't be resumed.
+  if (draftId && draftPrefilled && !programsLoading && !selectedProgram) {
+    return (
+      <div className="p-6 max-w-lg mx-auto">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center">
+          <div className="w-16 h-16 mx-auto bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mb-4">
+            <AlertCircle size={32} className="text-yellow-600" />
+          </div>
+          <h1 className="text-xl font-bold text-[var(--text)] mb-2">Program No Longer Available</h1>
+          <p className="text-sm text-[var(--muted)] mb-6">
+            {draft?.program?.name ? `"${draft.program.name}"` : "This program"} is not currently accepting
+            applications, so this draft can&apos;t be submitted. You can withdraw it or browse other programs.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button variant="primary" onClick={() => router.push("/borrower/discover")}>
+              Browse Programs
+            </Button>
+            <Button variant="secondary" onClick={() => router.push("/borrower/applications")}>
+              Back to Applications
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (submittedId) {
     return (
@@ -169,8 +238,14 @@ export default function NewApplicationPage() {
           <ArrowLeft size={20} className="text-[var(--muted)]" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text)]">New Loan Application</h1>
-          <p className="text-sm text-[var(--muted)]">Complete the steps below to apply for a loan</p>
+          <h1 className="text-2xl font-bold text-[var(--text)]">
+            {draftId ? "Continue Application" : "New Loan Application"}
+          </h1>
+          <p className="text-sm text-[var(--muted)]">
+            {draftId
+              ? "Finish the steps below and submit your draft application"
+              : "Complete the steps below to apply for a loan"}
+          </p>
         </div>
       </div>
 
@@ -217,7 +292,11 @@ export default function NewApplicationPage() {
         {currentStep === 1 && (
           <div>
             <h2 className="text-lg font-semibold text-[var(--text)] mb-4">Select a Loan Program</h2>
-            <p className="text-sm text-[var(--muted)] mb-6">Choose from programs you're eligible for based on your FarmScore and profile.</p>
+            <p className="text-sm text-[var(--muted)] mb-6">
+              {programLocked
+                ? "This program is locked in. Continue to review the loan details and submit."
+                : "Choose from programs you're eligible for based on your FarmScore and profile."}
+            </p>
 
             {programsLoading ? (
               <p className="text-sm text-[var(--muted)] text-center py-8">Loading programs…</p>
@@ -228,8 +307,12 @@ export default function NewApplicationPage() {
                 {rankedPrograms.map(({ program, match }) => (
                   <div
                     key={program.id}
-                    onClick={() => setFormData({ ...formData, programId: program.id })}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                    onClick={() => { if (!programLocked) setFormData({ ...formData, programId: program.id }); }}
+                    className={`p-4 rounded-xl border-2 transition-all ${
+                      programLocked && program.id !== formData.programId
+                        ? "opacity-40 pointer-events-none border-[var(--border)]"
+                        : "cursor-pointer"
+                    } ${
                       formData.programId === program.id
                         ? "border-brand-green bg-green-50 dark:bg-green-900/20"
                         : "border-[var(--border)] hover:border-brand-green/50"
@@ -264,7 +347,10 @@ export default function NewApplicationPage() {
           </div>
         )}
 
-        {/* Step 2: Loan Details */}
+        {/* Step 2: Loan Details — wait for the locked program to load before rendering */}
+        {currentStep === 2 && !selectedProgram && programsLoading && (
+          <p className="text-sm text-[var(--muted)] text-center py-8">Loading program details…</p>
+        )}
         {currentStep === 2 && selectedProgram && (
           <div>
             <h2 className="text-lg font-semibold text-[var(--text)] mb-4">Loan Details</h2>
@@ -481,7 +567,7 @@ export default function NewApplicationPage() {
 
       {/* Navigation */}
       <div className="flex items-center justify-between">
-        <Button variant="secondary" onClick={handleBack} disabled={currentStep === 1 || isSubmitting}>
+        <Button variant="secondary" onClick={handleBack} disabled={currentStep === minStep || isSubmitting}>
           <ArrowLeft size={16} className="mr-2" /> Back
         </Button>
 

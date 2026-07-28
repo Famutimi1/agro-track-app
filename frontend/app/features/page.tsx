@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { Check, ArrowRight } from "lucide-react";
-import { useTheme } from "next-themes";
 import { PublicNav } from "@/components/layout/public-nav";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
@@ -113,22 +112,12 @@ const featuresData = [
 ];
 
 export default function FeaturesPage() {
-  const { resolvedTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
-
   return (
     <div className="bg-white dark:bg-gray-900 text-[var(--text)] min-h-screen">
       <PublicNav />
 
       {/* Hero */}
-      <section
-        className="pt-[68px] pb-24 px-6 text-center"
-        style={{
-          background: dark
-            ? "linear-gradient(160deg,#0a1a0a 0%,#111827 100%)"
-            : "linear-gradient(160deg,#042007 0%,#1B5E20 100%)",
-        }}
-      >
+      <section className="pt-[68px] pb-24 px-6 text-center bg-[linear-gradient(160deg,#042007_0%,#1B5E20_100%)] dark:bg-[linear-gradient(160deg,#0a1a0a_0%,#111827_100%)]">
         <div className="max-w-[800px] mx-auto pt-20">
           <span className="inline-block text-[12px] font-bold text-brand-gold uppercase tracking-widest bg-brand-gold/15 border border-brand-gold/25 px-4 py-1.5 rounded-full mb-6">
             Platform Features
@@ -158,9 +147,10 @@ export default function FeaturesPage() {
             >
               <div style={{ direction: "ltr" }}>
                 <div
-                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-4"
+                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-4 bg-[var(--tag-bg)] dark:bg-[var(--tag-bg-dark)]"
                   style={{
-                    background: dark ? feature.darkBg + "80" : feature.bg,
+                    ["--tag-bg" as string]: feature.bg,
+                    ["--tag-bg-dark" as string]: feature.darkBg + "80",
                     border: `1px solid ${feature.color}30`,
                   }}
                 >
@@ -179,9 +169,10 @@ export default function FeaturesPage() {
                   {feature.points.map((point, pi) => (
                     <div key={pi} className="flex gap-3 items-start">
                       <div
-                        className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                        className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 bg-[var(--pt-bg)] dark:bg-[var(--pt-bg-dark)]"
                         style={{
-                          background: dark ? feature.darkBg : feature.bg,
+                          ["--pt-bg" as string]: feature.bg,
+                          ["--pt-bg-dark" as string]: feature.darkBg,
                         }}
                       >
                         <Check size={12} style={{ color: feature.color }} />
@@ -202,9 +193,10 @@ export default function FeaturesPage() {
                 </Link>
               </div>
               <div
-                className="rounded-3xl p-10 text-center"
+                className="rounded-3xl p-10 text-center bg-[var(--stat-bg)] dark:bg-[var(--stat-bg-dark)]"
                 style={{
-                  background: dark ? feature.darkBg + "60" : feature.bg,
+                  ["--stat-bg" as string]: feature.bg,
+                  ["--stat-bg-dark" as string]: feature.darkBg + "60",
                   border: `1px solid ${feature.color}25`,
                   direction: "ltr",
                 }}

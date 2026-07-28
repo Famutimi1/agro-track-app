@@ -2,6 +2,7 @@
 
 import { Menu, Search, Moon, Sun, Bell, TrendingUp } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { UserMenu } from "./user-menu";
 import { useMyFarmScore } from "@/lib/hooks";
@@ -23,6 +24,8 @@ interface BorrowerTopbarProps {
 export function BorrowerTopbar({ sidebarOpen, setSidebarOpen }: BorrowerTopbarProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const dark = resolvedTheme === "dark";
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const { data: scoreData } = useMyFarmScore();
   const { data: notifCount = 0 } = useUnreadNotificationCount();
 
@@ -59,7 +62,7 @@ export function BorrowerTopbar({ sidebarOpen, setSidebarOpen }: BorrowerTopbarPr
           onClick={() => setTheme(dark ? "light" : "dark")}
           className="w-9 h-9 rounded-[10px] border border-[var(--border)] bg-[var(--input-bg)] flex items-center justify-center cursor-pointer"
         >
-          {dark ? (
+          {mounted && dark ? (
             <Sun size={15} className="text-yellow-400" />
           ) : (
             <Moon size={15} className="text-yellow-800" />

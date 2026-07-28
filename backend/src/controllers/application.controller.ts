@@ -21,6 +21,12 @@ export class ApplicationController {
     res.json({ success: true, data: application });
   }
 
+  static async update(req: Request, res: Response) {
+    const userId = req.user!.sub;
+    const application = await ApplicationService.updateDraft(userId, req.params.id, req.body);
+    res.json({ success: true, data: application });
+  }
+
   static async withdraw(req: Request, res: Response) {
     const userId = req.user!.sub;
     const application = await ApplicationService.withdraw(userId, req.params.id);

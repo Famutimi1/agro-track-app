@@ -7,7 +7,7 @@ import {
   ArrowLeft, MapPin, Phone, Mail, Calendar, User,
   TrendingUp, CheckCircle, XCircle, AlertTriangle, Clock,
   FileText, Leaf, DollarSign, Flag, Ban, Eye, Download,
-  ChevronRight, RefreshCw, Camera, Shield
+  ChevronRight, RefreshCw, Camera, Shield, MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,7 @@ import {
   FLAG_SEVERITIES,
 } from "@/lib/api/borrowers";
 import { type Loan } from "@/lib/api/loans";
+import { useCreateConversationWithBorrower } from "@/lib/hooks/use-messages";
 
 type TabKey = "overview" | "loans" | "reports" | "farmscore" | "documents" | "activity";
 
@@ -129,6 +130,17 @@ export default function BorrowerDetailPage() {
     }
   };
 
+  const createConversation = useCreateConversationWithBorrower();
+
+  const handleMessage = async () => {
+    try {
+      const conversation = await createConversation.mutateAsync(id);
+      router.push(`/lender/messages?conversationId=${conversation.id}`);
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to open conversation");
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
@@ -207,6 +219,9 @@ export default function BorrowerDetailPage() {
             <p className="text-xs text-[var(--muted)]">FarmScore</p>
           </div>
           <div className="flex gap-2">
+            <Button variant="primary" onClick={handleMessage} disabled={createConversation.isPending}>
+              <MessageSquare size={14} className="mr-1" /> {createConversation.isPending ? "Opening…" : "Message"}
+            </Button>
             <Button variant="secondary" onClick={() => setShowFlagModal(true)}>
               <Flag size={14} className="mr-1" /> Flag
             </Button>

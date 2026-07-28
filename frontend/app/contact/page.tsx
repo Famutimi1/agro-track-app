@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CheckCircle } from "lucide-react";
-import { useTheme } from "next-themes";
 import { PublicNav } from "@/components/layout/public-nav";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
@@ -61,9 +60,6 @@ const contactInfo = [
 ];
 
 export default function ContactPage() {
-  const { resolvedTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
-
   const [form, setForm] = useState({
     name: "",
     org: "",
@@ -86,14 +82,7 @@ export default function ContactPage() {
       <PublicNav />
 
       {/* Hero */}
-      <section
-        className="pt-[68px] pb-24 px-6 text-center"
-        style={{
-          background: dark
-            ? "linear-gradient(160deg,#0a1a0a 0%,#111827 100%)"
-            : "linear-gradient(160deg,#042007 0%,#1B5E20 100%)",
-        }}
-      >
+      <section className="pt-[68px] pb-24 px-6 text-center bg-[linear-gradient(160deg,#042007_0%,#1B5E20_100%)] dark:bg-[linear-gradient(160deg,#0a1a0a_0%,#111827_100%)]">
         <div className="max-w-[800px] mx-auto pt-20">
           <h1 className="text-[clamp(32px,5vw,56px)] font-black text-white leading-[1.1] tracking-tight mb-5">
             Let&apos;s talk about{" "}
@@ -110,12 +99,7 @@ export default function ContactPage() {
       <section className="px-6 -mt-12 pb-24">
         <div className="max-w-[1100px] mx-auto grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-12 items-start">
           {/* Form */}
-          <div
-            className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-10"
-            style={{
-              boxShadow: dark ? "none" : "0 8px 32px rgba(0,0,0,0.08)",
-            }}
-          >
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-10 shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-none">
             {submitted ? (
               <div className="text-center py-10">
                 <div className="w-[72px] h-[72px] rounded-full bg-green-50 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-5">

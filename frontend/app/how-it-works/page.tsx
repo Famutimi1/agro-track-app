@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { useTheme } from "next-themes";
 import { PublicNav } from "@/components/layout/public-nav";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
@@ -115,22 +114,13 @@ const timeline = [
 ];
 
 export default function HowItWorksPage() {
-  const { resolvedTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
 
   return (
     <div className="bg-white dark:bg-gray-900 text-[var(--text)] min-h-screen">
       <PublicNav />
 
       {/* Hero */}
-      <section
-        className="pt-[68px] pb-24 px-6 text-center"
-        style={{
-          background: dark
-            ? "linear-gradient(160deg,#0a1a0a 0%,#111827 100%)"
-            : "linear-gradient(160deg,#042007 0%,#1B5E20 100%)",
-        }}
-      >
+      <section className="pt-[68px] pb-24 px-6 text-center bg-[linear-gradient(160deg,#042007_0%,#1B5E20_100%)] dark:bg-[linear-gradient(160deg,#0a1a0a_0%,#111827_100%)]">
         <div className="max-w-[800px] mx-auto pt-20">
           <h1 className="text-[clamp(32px,5vw,56px)] font-black text-white leading-[1.1] tracking-tight mb-5">
             From program launch to{" "}
@@ -158,9 +148,10 @@ export default function HowItWorksPage() {
             {actors.map((actor) => (
               <div
                 key={actor.label}
-                className="rounded-2xl p-7"
+                className="rounded-2xl p-7 bg-[var(--a-bg)] dark:bg-[var(--a-bg-dark)]"
                 style={{
-                  background: dark ? actor.darkBg + "50" : actor.bg,
+                  ["--a-bg" as string]: actor.bg,
+                  ["--a-bg-dark" as string]: actor.darkBg + "50",
                   border: `1px solid ${actor.color}25`,
                 }}
               >
@@ -234,11 +225,10 @@ export default function HowItWorksPage() {
                     </div>
                     <div className="flex flex-col items-center z-10">
                       <div
-                        className="w-12 h-12 rounded-full flex items-center justify-center text-brand-gold font-extrabold text-sm border-[3px] border-brand-gold"
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-brand-gold font-extrabold text-sm border-[3px] border-brand-gold ring-4 ring-white dark:ring-gray-900"
                         style={{
                           background:
                             "linear-gradient(135deg,#1B5E20,#2E7D32)",
-                          boxShadow: `0 0 0 4px ${dark ? "#111827" : "#fff"}`,
                         }}
                       >
                         {step.num}
@@ -251,11 +241,10 @@ export default function HowItWorksPage() {
                     <div />
                     <div className="flex flex-col items-center z-10">
                       <div
-                        className="w-12 h-12 rounded-full flex items-center justify-center text-brand-gold font-extrabold text-sm border-[3px] border-brand-gold"
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-brand-gold font-extrabold text-sm border-[3px] border-brand-gold ring-4 ring-white dark:ring-gray-900"
                         style={{
                           background:
                             "linear-gradient(135deg,#1B5E20,#2E7D32)",
-                          boxShadow: `0 0 0 4px ${dark ? "#111827" : "#fff"}`,
                         }}
                       >
                         {step.num}

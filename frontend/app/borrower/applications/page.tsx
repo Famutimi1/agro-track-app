@@ -176,7 +176,11 @@ export default function BorrowerApplicationsPage() {
                 </div>
 
                 <Link
-                  href={`/borrower/applications/${app.id}`}
+                  href={
+                    app.status === "DRAFT"
+                      ? `/borrower/applications/new?draftId=${app.id}`
+                      : `/borrower/applications/${app.id}`
+                  }
                   className="flex items-center gap-1 text-sm text-brand-green hover:underline"
                 >
                   {app.status === "DRAFT" ? "Continue" : "View"} <ChevronRight size={14} />

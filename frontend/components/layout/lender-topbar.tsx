@@ -2,6 +2,7 @@
 
 import { Menu, Search, Moon, Sun, Bell, Plus } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "./user-menu";
 
@@ -22,6 +23,8 @@ export function LenderTopbar({
 }: LenderTopbarProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const dark = resolvedTheme === "dark";
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
     <header className="h-16 flex items-center px-6 gap-4 bg-[var(--surface)] border-b border-[var(--border)] sticky top-0 z-10">
@@ -45,7 +48,7 @@ export function LenderTopbar({
           onClick={() => setTheme(dark ? "light" : "dark")}
           className="w-9 h-9 rounded-[10px] border border-[var(--border)] bg-[var(--input-bg)] flex items-center justify-center cursor-pointer"
         >
-          {dark ? (
+          {mounted && dark ? (
             <Sun size={15} className="text-yellow-400" />
           ) : (
             <Moon size={15} className="text-yellow-800" />

@@ -46,10 +46,16 @@ export function useSocketEvent<K extends keyof SocketEvents>(
   event: K,
   callback: SocketEvents[K]
 ) {
+  // Re-subscribe whenever the connection becomes ready: subscribeToEvent binds to
+  // the socket instance that exists at call time, so a handler registered before
+  // the socket connected (fresh login, reload before auth, reconnect) would attach
+  // to nothing. Keying the effect on isConnected rebinds to the live socket.
+  const { isConnected } = useRealtimeStore();
+
   useEffect(() => {
     const unsubscribe = subscribeToEvent(event, callback);
     return unsubscribe;
-  }, [event, callback]);
+  }, [event, callback, isConnected]);
 }
 
 export function useRealtimeInvalidation() {
@@ -59,6 +65,7 @@ export function useRealtimeInvalidation() {
     (data: { loanId: string }) => {
       queryClient.invalidateQueries({ queryKey: loanKeys.detail(data.loanId) });
       queryClient.invalidateQueries({ queryKey: loanKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: loanKeys.mine() });
     },
     [queryClient]
   );
@@ -74,6 +81,8 @@ export function useRealtimeInvalidation() {
   const handleDisbursementProcessed = useCallback(
     (data: { loanId: string }) => {
       queryClient.invalidateQueries({ queryKey: loanKeys.detail(data.loanId) });
+      queryClient.invalidateQueries({ queryKey: loanKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: loanKeys.mine() });
       queryClient.invalidateQueries({ queryKey: ["disbursements"] });
     },
     [queryClient]

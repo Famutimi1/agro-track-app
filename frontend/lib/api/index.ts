@@ -44,7 +44,6 @@ export { fieldAgentsApi, type FieldAgent, type FieldVisit, type FieldAgentsQuery
 export { cooperativesApi, type Cooperative, type CooperativeMember, type CooperativesQuery } from "./cooperatives";
 export { notificationsApi, type Notification, type NotificationPreferences, type NotificationEventType, type NotificationChannelType, type NotificationsQuery } from "./notifications";
 export { reportsApi, type Report, type ReportsQuery, type ReportType, type GenerateReportOptions, type ImpactMetrics, type ReportJob, type DateRangeQuery, REPORT_TYPES } from "./reports";
-export { documentsApi, type Document, type UploadUrlResponse } from "./documents";
 export {
   dashboardApi,
   type DashboardStats,

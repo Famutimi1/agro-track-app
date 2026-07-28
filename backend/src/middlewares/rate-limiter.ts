@@ -69,3 +69,13 @@ export const generalLimiter = rateLimiter({
   max: 100,
   keyGenerator: (req) => `general:${(req as any).user?.sub || req.ip}`,
 });
+
+// Per-user message send cap. Generous for real conversation, tight enough to
+// blunt spam/abuse from a single account (keyed by user id, not IP, so it holds
+// across devices/networks).
+export const messageSendLimiter = rateLimiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyGenerator: (req) => `msg-send:${(req as any).user?.sub || req.ip}`,
+  message: "You're sending messages too fast. Please slow down.",
+});

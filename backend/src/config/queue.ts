@@ -46,8 +46,9 @@ export const smsQueue = createQueue("sms") as Bull.Queue;
 export const pushQueue = createQueue("push") as Bull.Queue;
 export const webhookQueue = createQueue("webhook") as Bull.Queue;
 export const reportQueue = createQueue("report") as Bull.Queue;
+export const maintenanceQueue = createQueue("maintenance") as Bull.Queue;
 
-const queues: QueueLike[] = [emailQueue, smsQueue, pushQueue, webhookQueue, reportQueue];
+const queues: QueueLike[] = [emailQueue, smsQueue, pushQueue, webhookQueue, reportQueue, maintenanceQueue];
 
 // Track which queues have already logged their first error to avoid spam.
 const queueErrorLogged = new Set<string>();

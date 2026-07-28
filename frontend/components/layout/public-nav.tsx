@@ -36,7 +36,7 @@ export function PublicNav() {
           <div className="w-[34px] h-[34px] bg-gradient-to-br from-brand-green to-brand-green-light rounded-[9px] flex items-center justify-center">
             <Leaf size={17} className="text-brand-gold" />
           </div>
-          <span className={`font-black text-[19px] tracking-tight ${dark ? "text-gray-50" : "text-brand-green"}`}>
+          <span className="font-black text-[19px] tracking-tight text-brand-green dark:text-gray-50">
             AgroTrack
           </span>
         </Link>

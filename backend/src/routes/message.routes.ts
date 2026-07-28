@@ -3,6 +3,7 @@ import { authenticate, authorize } from "../middlewares/auth";
 import { asyncHandler } from "../utils/async-handler";
 import { MessageService } from "../services/message.service";
 import { ApiError } from "../utils/api-error";
+import { messageSendLimiter } from "../middlewares/rate-limiter";
 
 export const messageRouter = Router();
 
@@ -29,6 +30,7 @@ messageRouter.get(
     const query = {
       page: req.query.page ? parseInt(req.query.page as string) : undefined,
       limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+      beforeSeq: req.query.beforeSeq ? parseInt(req.query.beforeSeq as string) : undefined,
     };
     const result = await MessageService.getMessages(req.params.conversationId, req.user!.sub, query);
     res.json({ success: true, ...result });
@@ -38,15 +40,25 @@ messageRouter.get(
 // Send message
 messageRouter.post(
   "/conversations/:conversationId/messages",
+  messageSendLimiter,
   asyncHandler(async (req, res) => {
-    const { content, channel } = req.body;
-    if (!content) throw ApiError.badRequest("Content is required");
+    const { content, channel, clientId } = req.body;
+    if (typeof content !== "string" || !content.trim()) {
+      throw ApiError.badRequest("Content is required");
+    }
+    if (content.length > 5000) {
+      throw ApiError.badRequest("Message is too long (max 5000 characters)");
+    }
+    if (clientId !== undefined && (typeof clientId !== "string" || clientId.length > 100)) {
+      throw ApiError.badRequest("Invalid clientId");
+    }
 
     const message = await MessageService.sendMessage(
       req.params.conversationId,
       req.user!.sub,
-      content,
-      channel
+      content.trim(),
+      channel,
+      clientId
     );
     res.status(201).json({ success: true, data: message });
   })

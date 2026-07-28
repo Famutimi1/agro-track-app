@@ -17,6 +17,12 @@ import {
 } from "@/lib/hooks";
 import Link from "next/link";
 import { useSocketRoom, useSocketEvent } from "@/lib/socket/hooks";
+import { useRealtimeStore } from "@/lib/stores";
+import {
+  ackMessageDelivered,
+  emitConversationRead,
+  syncConversation,
+} from "@/lib/socket";
 import { useQueryClient } from "@tanstack/react-query";
 import { messageKeys } from "@/lib/hooks/use-messages";
 import type { Message } from "@/lib/api/messages";
@@ -52,28 +58,64 @@ export default function BorrowerMessagesPage() {
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
 
   const { data: messagesData, isLoading: messagesLoading } = useMessages(activeConversationId);
-  const messages = useMemo(() => [...(messagesData?.data || [])].reverse(), [messagesData]);
+  // Backend returns messages in ascending seq order (oldest→newest). Sort by seq
+  // explicitly so ordering never depends on array position or clock-based fields.
+  const messages = useMemo(
+    () => [...(messagesData?.data || [])].sort((a, b) => Number(BigInt(a.seq ?? 0) - BigInt(b.seq ?? 0))),
+    [messagesData]
+  );
 
   const sendMessage = useSendMessage();
   const markAsRead = useMarkAsRead();
   const queryClient = useQueryClient();
+  const isConnected = useRealtimeStore((s) => s.isConnected);
 
   useSocketRoom(activeConversationId ? `conversation:${activeConversationId}` : null);
+
+  const refreshActive = useCallback(() => {
+    if (activeConversationId) {
+      queryClient.invalidateQueries({ queryKey: messageKeys.messages(activeConversationId) });
+    }
+    queryClient.invalidateQueries({ queryKey: messageKeys.conversations({}) });
+  }, [activeConversationId, queryClient]);
 
   const handleNewMessage = useCallback(
     (data: Message) => {
       if (data.conversationId === activeConversationId) {
+        // Delivered receipt: confirm receipt of the other party's message so the
+        // sender's tick advances to DELIVERED.
+        if (userId && data.senderId !== userId) {
+          ackMessageDelivered(data.id);
+        }
         queryClient.invalidateQueries({ queryKey: messageKeys.messages(activeConversationId) });
       }
       queryClient.invalidateQueries({ queryKey: messageKeys.conversations({}) });
     },
-    [activeConversationId, queryClient]
+    [activeConversationId, queryClient, userId]
   );
   useSocketEvent("message:new", handleNewMessage);
+
+  // Delivered/read receipts pushed from the server → refresh so ticks update live.
+  useSocketEvent("message:delivered", refreshActive);
+  useSocketEvent("message:read", refreshActive);
+
+  // Reconnect catch-up: when the socket (re)connects, pull anything newer than the
+  // last seq we have for the open conversation — closes the gap where a message
+  // arrived while the socket was down, without waiting on the poll interval.
+  useEffect(() => {
+    if (!isConnected || !activeConversationId) return;
+    const lastSeq = messages.length ? Number(messages[messages.length - 1].seq ?? 0) : 0;
+    syncConversation(activeConversationId, lastSeq).then((missed) => {
+      if (missed.length > 0) refreshActive();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, activeConversationId]);
 
   useEffect(() => {
     if (activeConversationId && activeConversation && activeConversation.unreadCount > 0) {
       markAsRead.mutate(activeConversationId);
+      // Live read receipt over the socket so the sender's ticks turn blue now.
+      emitConversationRead(activeConversationId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversationId, activeConversation?.unreadCount]);

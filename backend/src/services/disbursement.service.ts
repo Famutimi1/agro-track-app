@@ -3,6 +3,8 @@ import { prisma } from "../config/prisma";
 import { ApiError } from "../utils/api-error";
 import { getPagination, paginatedResponse, PaginationQuery } from "../utils/pagination";
 import { logger } from "../config/logger";
+import { emitToUser, emitToLender } from "../config/socket";
+import { NotificationService, NotificationTemplates } from "./notification.service";
 
 interface DisbursementQuery extends PaginationQuery {
   status?: string;
@@ -264,11 +266,20 @@ export class DisbursementService {
   }
 
   static async approve(id: string, approvedBy: string) {
-    // Use transaction to prevent race conditions
-    return prisma.$transaction(async (tx) => {
+    // Approving a tranche disburses it in a single step: the tranche is marked
+    // COMPLETED, a payment transaction is recorded, and (for the first tranche)
+    // the loan is activated. A transaction prevents race conditions.
+    const result = await prisma.$transaction(async (tx) => {
       const d = await tx.disbursement.findUnique({
         where: { id },
-        include: { loan: true },
+        include: {
+          loan: {
+            include: {
+              borrower: { select: { userId: true } },
+              program: { select: { lenderOrgId: true } },
+            },
+          },
+        },
       });
       if (!d) throw ApiError.notFound("Disbursement not found");
       if (d.status !== "PENDING") throw ApiError.badRequest("Can only approve pending disbursements");
@@ -294,21 +305,99 @@ export class DisbursementService {
         throw ApiError.badRequest("Another tranche is currently being processed");
       }
 
+      const now = new Date();
+      const paymentRef = `DISB-${d.id}-${now.getTime()}`;
+
       const updated = await tx.disbursement.update({
         where: { id },
-        data: { status: "APPROVED", approvedBy, approvedAt: new Date() },
+        data: {
+          status: "COMPLETED",
+          approvedBy,
+          approvedAt: now,
+          processedAt: now,
+          paymentRef,
+        },
       });
 
-      // Update loan's current tranche tracker
+      // Record the disbursement transaction
+      await tx.transaction.create({
+        data: {
+          reference: paymentRef,
+          type: "DISBURSEMENT",
+          status: "SUCCESS",
+          amount: d.amount,
+          loanId: d.loanId,
+          borrowerId: d.loan.borrowerId,
+          processedAt: now,
+        },
+      });
+
+      // Advance the loan's tranche tracker; activate on first disbursement
       await tx.borrowerLoan.update({
         where: { id: d.loanId },
-        data: { currentTranche: d.trancheNumber },
+        data: {
+          currentTranche: d.trancheNumber,
+          ...(d.trancheNumber === 1 ? { status: "ACTIVE", startDate: now } : {}),
+        },
       });
 
-      logger.info("Disbursement approved", { id, tranche: d.trancheNumber, loanId: d.loanId });
+      await tx.auditLog.create({
+        data: {
+          userId: approvedBy,
+          action: "DISBURSEMENT_APPROVED",
+          resource: "DISBURSEMENT",
+          resourceId: id,
+          details: { trancheNumber: d.trancheNumber, amount: Number(d.amount), paymentRef },
+        },
+      });
 
-      return updated;
+      logger.info("Disbursement approved and released", {
+        id,
+        tranche: d.trancheNumber,
+        loanId: d.loanId,
+      });
+
+      return {
+        disbursement: updated,
+        loanId: d.loanId,
+        trancheNumber: d.trancheNumber,
+        amount: Number(d.amount),
+        borrowerUserId: d.loan.borrower.userId,
+        lenderOrgId: d.loan.program.lenderOrgId,
+      };
     });
+
+    // Fire notifications and real-time updates outside the transaction
+    this.emitDisbursementCompleted(result);
+
+    return result.disbursement;
+  }
+
+  // Notify the borrower and refresh both lender and borrower views in real time.
+  private static emitDisbursementCompleted(result: {
+    loanId: string;
+    trancheNumber: number;
+    amount: number;
+    borrowerUserId: string;
+    lenderOrgId: string;
+  }) {
+    const { loanId, trancheNumber, amount, borrowerUserId, lenderOrgId } = result;
+
+    NotificationService.send({
+      userId: borrowerUserId,
+      ...NotificationTemplates.disbursementReceived(amount, trancheNumber),
+      actionUrl: "/borrower/loans",
+    }).catch((err) =>
+      logger.error("Failed to send disbursement notification", { loanId, err })
+    );
+
+    // Borrower's live views (My Loans, disbursement layers)
+    emitToUser(borrowerUserId, "disbursement:processed", { loanId });
+    emitToUser(borrowerUserId, "loan:updated", { loanId, status: "ACTIVE" });
+
+    // Lender org's live views (disbursements queue, loan detail/list)
+    emitToLender(lenderOrgId, "disbursement:processed", { loanId });
+    emitToLender(lenderOrgId, "loan:updated", { loanId, status: "ACTIVE" });
   }
 
   static async process(id: string, paymentRef: string) {
@@ -402,7 +491,17 @@ export class DisbursementService {
   }
 
   static async manualRelease(id: string, reviewerId: string, paymentRef: string, notes: string) {
-    const d = await prisma.disbursement.findUnique({ where: { id } });
+    const d = await prisma.disbursement.findUnique({
+      where: { id },
+      include: {
+        loan: {
+          include: {
+            borrower: { select: { userId: true } },
+            program: { select: { lenderOrgId: true } },
+          },
+        },
+      },
+    });
     if (!d) throw ApiError.notFound("Disbursement not found");
     if (!["APPROVED", "FAILED"].includes(d.status)) {
       throw ApiError.badRequest("Can only manually release approved or failed disbursements");
@@ -425,6 +524,7 @@ export class DisbursementService {
           status: "SUCCESS",
           amount: d.amount,
           loanId: d.loanId,
+          borrowerId: d.loan.borrowerId,
           processedAt: new Date(),
         },
       });
@@ -450,6 +550,14 @@ export class DisbursementService {
     });
 
     logger.info("Disbursement manually released", { id, paymentRef });
+
+    this.emitDisbursementCompleted({
+      loanId: d.loanId,
+      trancheNumber: d.trancheNumber,
+      amount: Number(d.amount),
+      borrowerUserId: d.loan.borrower.userId,
+      lenderOrgId: d.loan.program.lenderOrgId,
+    });
 
     return result;
   }

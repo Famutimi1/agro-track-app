@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { Star, ArrowRight } from "lucide-react";
-import { useTheme } from "next-themes";
 import { PublicNav } from "@/components/layout/public-nav";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
@@ -95,22 +94,13 @@ const caseStudies = [
 ];
 
 export default function TestimonialsPage() {
-  const { resolvedTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
 
   return (
     <div className="bg-white dark:bg-gray-900 text-[var(--text)] min-h-screen">
       <PublicNav />
 
       {/* Hero */}
-      <section
-        className="pt-[68px] pb-24 px-6 text-center"
-        style={{
-          background: dark
-            ? "linear-gradient(160deg,#0a1a0a 0%,#111827 100%)"
-            : "linear-gradient(160deg,#042007 0%,#1B5E20 100%)",
-        }}
-      >
+      <section className="pt-[68px] pb-24 px-6 text-center bg-[linear-gradient(160deg,#042007_0%,#1B5E20_100%)] dark:bg-[linear-gradient(160deg,#0a1a0a_0%,#111827_100%)]">
         <div className="max-w-[800px] mx-auto pt-20">
           <h1 className="text-[clamp(32px,5vw,56px)] font-black text-white leading-[1.1] tracking-tight mb-5">
             Trusted by Nigeria&apos;s{" "}
@@ -178,17 +168,19 @@ export default function TestimonialsPage() {
             {caseStudies.map((cs) => (
               <div
                 key={cs.title}
-                className="rounded-2xl p-7"
+                className="rounded-2xl p-7 bg-[var(--cs-bg)] dark:bg-[var(--cs-bg-dark)]"
                 style={{
-                  background: dark ? cs.darkBg + "50" : cs.bg,
+                  ["--cs-bg" as string]: cs.bg,
+                  ["--cs-bg-dark" as string]: cs.darkBg + "50",
                   border: `1px solid ${cs.color}25`,
                 }}
               >
                 <span
-                  className="inline-block text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full mb-4"
+                  className="inline-block text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full mb-4 bg-[var(--tag-bg)] dark:bg-[var(--tag-bg-dark)]"
                   style={{
                     color: cs.color,
-                    background: dark ? cs.darkBg : cs.bg + "80",
+                    ["--tag-bg" as string]: cs.bg + "80",
+                    ["--tag-bg-dark" as string]: cs.darkBg,
                   }}
                 >
                   {cs.tag}

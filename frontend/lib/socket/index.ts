@@ -2,9 +2,13 @@ export {
   getSocket,
   initSocket,
   disconnectSocket,
+  reauthenticateSocket,
   joinRoom,
   leaveRoom,
   subscribeToEvent,
+  ackMessageDelivered,
+  emitConversationRead,
+  syncConversation,
   type SocketEvents,
 } from "./client";
 

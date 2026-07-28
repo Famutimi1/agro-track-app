@@ -72,14 +72,20 @@ export function useTrancheStatus(loanId: string) {
   });
 }
 
+// Approving disburses the tranche, which changes loan status, tranche progress
+// and disbursed totals — so refresh loans (list, mine, detail) alongside
+// the disbursement queues and tranche views.
+function invalidateDisbursementQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: disbursementKeys.all });
+  queryClient.invalidateQueries({ queryKey: loanKeys.all });
+}
+
 export function useApproveDisbursement() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (id: string) => disbursementsApi.approve(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: disbursementKeys.lists() });
-    },
+    onSuccess: () => invalidateDisbursementQueries(queryClient),
   });
 }
 
@@ -89,9 +95,7 @@ export function useProcessDisbursement() {
   return useMutation({
     mutationFn: ({ id, paymentRef }: { id: string; paymentRef: string }) =>
       disbursementsApi.process(id, paymentRef),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: disbursementKeys.lists() });
-    },
+    onSuccess: () => invalidateDisbursementQueries(queryClient),
   });
 }
 

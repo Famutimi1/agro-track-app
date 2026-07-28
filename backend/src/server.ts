@@ -4,7 +4,7 @@ import { env } from "./config/env";
 import { prisma } from "./config/prisma";
 import { connectRedis, redis, redisEnabled } from "./config/redis";
 import { logger } from "./config/logger";
-import { initializeSocket } from "./config/socket";
+import { initializeSocket, closeSocketRedis } from "./config/socket";
 import { initializeQueues, closeQueues } from "./config/queue";
 
 async function main() {
@@ -38,6 +38,7 @@ main().catch((err) => {
 process.on("SIGTERM", async () => {
   logger.info("Shutting down gracefully...");
   await closeQueues().catch(() => {});
+  await closeSocketRedis().catch(() => {});
   await redis.quit().catch(() => {});
   await prisma.$disconnect();
   process.exit(0);

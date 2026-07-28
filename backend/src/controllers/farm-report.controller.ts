@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { FarmReportService } from "../services/farm-report.service";
-import { S3Service } from "../services/s3.service";
+import { CloudinaryService } from "../services/cloudinary.service";
 import { asyncHandler } from "../utils/async-handler";
 import { ApiError } from "../utils/api-error";
 
@@ -15,7 +15,7 @@ export const uploadFarmReportPhotos = asyncHandler(async (req: Request, res: Res
 
   const uploads = await Promise.all(
     files.map((file) =>
-      S3Service.uploadFile(file.buffer, file.mimetype, `farm-reports/${req.user!.sub}`, file.originalname)
+      CloudinaryService.uploadFile(file.buffer, file.mimetype, `farm-reports/${req.user!.sub}`, file.originalname)
     )
   );
 

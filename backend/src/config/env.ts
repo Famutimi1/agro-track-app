@@ -26,12 +26,14 @@ const envSchema = z.object({
   MAX_FILE_SIZE: z.coerce.number().default(5242880),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
   RATE_LIMIT_MAX: z.coerce.number().default(100),
+  // Message retention in days. 0 (default) = keep forever. When > 0, a daily
+  // job deletes messages older than this window. Destructive — opt-in only.
+  MESSAGE_RETENTION_DAYS: z.coerce.number().default(0),
   PAYSTACK_SECRET_KEY: z.string().optional(),
   PAYSTACK_PUBLIC_KEY: z.string().optional(),
-  AWS_ACCESS_KEY_ID: z.string().optional(),
-  AWS_SECRET_ACCESS_KEY: z.string().optional(),
-  AWS_REGION: z.string().default("eu-west-1"),
-  AWS_S3_BUCKET: z.string().optional(),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
   TERMII_API_KEY: z.string().optional(),
   SENDGRID_API_KEY: z.string().optional(),
   PLATFORM_BANK_NAME: z.string().default("AgroTrack Microfinance Bank"),

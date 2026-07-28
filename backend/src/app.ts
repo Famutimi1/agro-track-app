@@ -7,6 +7,8 @@ import { env } from "./config/env";
 import { errorHandler } from "./middlewares/error-handler";
 import { auditMiddleware } from "./middlewares/audit";
 import { router } from "./routes";
+import { redisEnabled, redisAvailable } from "./config/redis";
+import { prisma } from "./config/prisma";
 
 const app = express();
 
@@ -45,9 +47,38 @@ if (env.NODE_ENV !== "test") {
 // Audit logging
 app.use(auditMiddleware);
 
-// Health check
-app.get("/api/health", (_req, res) => {
-  res.json({ success: true, message: "AgroTrack API is running", timestamp: new Date().toISOString() });
+// Health check — reports DB and Redis connectivity so orchestrators and load
+// balancers can gate traffic. Multi-instance deploys REQUIRE Redis (the
+// Socket.IO adapter and cross-instance delivery depend on it); when Redis is
+// enabled but unreachable we report "degraded" so it is visible.
+app.get("/api/health", async (_req, res) => {
+  let dbOk = true;
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch {
+    dbOk = false;
+  }
+
+  const redis = {
+    enabled: redisEnabled,
+    connected: redisEnabled ? redisAvailable : null,
+  };
+
+  // Redis is only a hard requirement when explicitly enabled (multi-instance).
+  const redisOk = !redisEnabled || redisAvailable;
+  const healthy = dbOk && redisOk;
+
+  res.status(healthy ? 200 : 503).json({
+    success: healthy,
+    status: healthy ? "ok" : "degraded",
+    message: "AgroTrack API",
+    services: {
+      database: dbOk ? "up" : "down",
+      redis: redisEnabled ? (redisAvailable ? "up" : "down") : "disabled",
+    },
+    redis,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Routes

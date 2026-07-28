@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -38,6 +40,11 @@ import {
   useAudienceCount,
 } from "@/lib/hooks/use-messages";
 import { usePrograms } from "@/lib/hooks/use-programs";
+import { useBorrowers } from "@/lib/hooks/use-borrowers";
+import { messageKeys, useCreateConversationWithBorrower } from "@/lib/hooks/use-messages";
+import { useSocketRoom, useSocketEvent } from "@/lib/socket/hooks";
+import { useRealtimeStore, useAuthStore } from "@/lib/stores";
+import { ackMessageDelivered, emitConversationRead, syncConversation } from "@/lib/socket";
 import {
   Conversation,
   Message,
@@ -57,8 +64,12 @@ export default function MessagesPage() {
   const [newMessage, setNewMessage] = useState("");
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showNewConvoModal, setShowNewConvoModal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const targetConversationId = searchParams.get("conversationId");
 
   const { data: conversationsData, isLoading: convoLoading } = useConversations({ search: searchQuery });
   const { data: messagesData, isLoading: msgsLoading } = useMessages(activeConversation?.id || null);
@@ -70,19 +81,98 @@ export default function MessagesPage() {
   const markAsRead = useMarkAsRead();
 
   const conversations = conversationsData?.data || [];
-  const messages = messagesData?.data || [];
+  // Order by seq (monotonic per-conversation) so messages never render out of
+  // order regardless of fetch/socket timing. Falls back to createdAt for any
+  // legacy rows without a seq.
+  const messages = [...(messagesData?.data || [])].sort((a: Message, b: Message) => {
+    const sa = a.seq != null ? Number(a.seq) : 0;
+    const sb = b.seq != null ? Number(b.seq) : 0;
+    if (sa !== sb) return sa - sb;
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
   const broadcasts = broadcastsData?.data || [];
   const programs = programsData?.data || [];
+
+  // Auto-open a conversation when arriving via ?conversationId= (e.g. from the
+  // "Message" button on a borrower's profile).
+  useEffect(() => {
+    if (targetConversationId && !activeConversation && conversations.length > 0) {
+      const match = conversations.find((c) => c.id === targetConversationId);
+      if (match) {
+        setActiveTab("conversations");
+        setActiveConversation(match);
+      }
+    }
+  }, [targetConversationId, activeConversation, conversations]);
+
+  // Realtime: join the active conversation room and refresh on incoming messages.
+  useSocketRoom(activeConversation ? `conversation:${activeConversation.id}` : null);
+
+  const isConnected = useRealtimeStore((s) => s.isConnected);
+  const userId = useAuthStore((s) => s.user?.id);
+
+  const refreshActive = useCallback(() => {
+    if (activeConversation) {
+      queryClient.invalidateQueries({ queryKey: messageKeys.messages(activeConversation.id) });
+    }
+    queryClient.invalidateQueries({ queryKey: messageKeys.conversations({}) });
+  }, [activeConversation, queryClient]);
+
+  const handleNewMessage = useCallback(
+    (data: Message) => {
+      if (activeConversation && data.conversationId === activeConversation.id) {
+        // Delivered receipt: confirm receipt of the other party's message.
+        if (userId && data.senderId !== userId) {
+          ackMessageDelivered(data.id);
+        }
+        queryClient.invalidateQueries({ queryKey: messageKeys.messages(activeConversation.id) });
+      }
+      queryClient.invalidateQueries({ queryKey: messageKeys.conversations({}) });
+    },
+    [activeConversation, queryClient, userId]
+  );
+  useSocketEvent("message:new", handleNewMessage);
+
+  // Delivered/read receipts pushed from the server → refresh so ticks update live.
+  useSocketEvent("message:delivered", refreshActive);
+  useSocketEvent("message:read", refreshActive);
+
+  // Reconnect catch-up: pull anything newer than the last seq we hold for the
+  // open conversation when the socket (re)connects.
+  useEffect(() => {
+    if (!isConnected || !activeConversation) return;
+    const lastSeq = messages.length ? Number(messages[messages.length - 1].seq ?? 0) : 0;
+    syncConversation(activeConversation.id, lastSeq).then((missed) => {
+      if (missed.length > 0) refreshActive();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, activeConversation?.id]);
 
   useEffect(() => {
     if (activeConversation && activeConversation.unreadCount > 0) {
       markAsRead.mutate(activeConversation.id);
+      // Live read receipt over the socket so the sender's ticks turn blue now.
+      emitConversationRead(activeConversation.id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversation?.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const createConversation = useCreateConversationWithBorrower();
+
+  const handleStartConversation = async (borrowerId: string) => {
+    try {
+      const conversation = await createConversation.mutateAsync(borrowerId);
+      setShowNewConvoModal(false);
+      setActiveTab("conversations");
+      setActiveConversation(conversation);
+    } catch {
+      // surfaced by the mutation state in the modal
+    }
+  };
 
   const handleSend = async () => {
     if (!newMessage.trim() || !activeConversation) return;
@@ -176,7 +266,10 @@ export default function MessagesPage() {
         <div className="flex gap-4 h-full">
           {/* Conversation List */}
           <Card className="w-80 flex-shrink-0 flex flex-col overflow-hidden">
-            <div className="p-3 border-b border-[var(--border)]">
+            <div className="p-3 border-b border-[var(--border)] space-y-2">
+              <Button size="sm" className="w-full" onClick={() => setShowNewConvoModal(true)}>
+                <Plus size={14} className="mr-1" /> New message
+              </Button>
               <div className="flex items-center gap-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg px-2.5 py-1.5">
                 <Search size={13} className="text-[var(--muted)]" />
                 <input
@@ -389,7 +482,81 @@ export default function MessagesPage() {
         open={showTemplateModal}
         onClose={() => setShowTemplateModal(false)}
       />
+
+      {/* New Conversation Modal */}
+      <NewConversationModal
+        open={showNewConvoModal}
+        onClose={() => setShowNewConvoModal(false)}
+        onSelect={handleStartConversation}
+        isCreating={createConversation.isPending}
+      />
     </div>
+  );
+}
+
+function NewConversationModal({
+  open,
+  onClose,
+  onSelect,
+  isCreating,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSelect: (borrowerId: string) => void;
+  isCreating: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const { data: borrowersData, isLoading } = useBorrowers({ search: search || undefined, limit: 20 });
+  const borrowers = borrowersData?.data || [];
+
+  return (
+    <Modal open={open} onClose={onClose} title="New message">
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg px-2.5 py-2">
+          <Search size={14} className="text-[var(--muted)]" />
+          <input
+            autoFocus
+            className="bg-transparent border-none outline-none text-sm flex-1 text-[var(--text)]"
+            placeholder="Search borrowers by name or farmer ID..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <div className="max-h-80 overflow-y-auto -mx-1">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-[var(--muted)]" />
+            </div>
+          ) : borrowers.length === 0 ? (
+            <p className="text-xs text-[var(--muted)] text-center py-8">No borrowers found</p>
+          ) : (
+            borrowers.map((b) => (
+              <button
+                key={b.id}
+                onClick={() => onSelect(b.id)}
+                disabled={isCreating}
+                className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-[var(--input-bg)] transition-colors flex items-center gap-3 disabled:opacity-50"
+              >
+                <div className="w-9 h-9 rounded-full bg-[var(--muted-bg)] flex items-center justify-center shrink-0">
+                  {b.user.avatarUrl ? (
+                    <img src={b.user.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
+                  ) : (
+                    <User size={16} className="text-[var(--muted)]" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[var(--text)] truncate">
+                    {b.user.firstName} {b.user.lastName}
+                  </p>
+                  <p className="text-[11px] text-[var(--muted)] font-mono">{b.farmerId}</p>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 }
 

@@ -159,6 +159,32 @@ export class ApplicationService {
     });
   }
 
+  static async updateDraft(
+    userId: string,
+    applicationId: string,
+    data: { amount?: number; purpose?: string }
+  ) {
+    const app = await this.getByIdForBorrower(userId, applicationId);
+    if (app.status !== "DRAFT") throw ApiError.badRequest("Only draft applications can be edited");
+
+    if (data.amount !== undefined) {
+      const program = await prisma.program.findUnique({ where: { id: app.programId } });
+      if (!program) throw ApiError.notFound("Program not found");
+      if (data.amount < Number(program.minAmount) || data.amount > Number(program.maxAmount)) {
+        throw ApiError.badRequest(`Amount must be between ₦${program.minAmount} and ₦${program.maxAmount}`);
+      }
+    }
+
+    return prisma.application.update({
+      where: { id: applicationId },
+      data: {
+        ...(data.amount !== undefined && { amount: data.amount }),
+        ...(data.purpose !== undefined && { purpose: data.purpose }),
+      },
+      include: { program: { select: { name: true, lenderOrg: { select: { name: true } } } } },
+    });
+  }
+
   static async withdraw(userId: string, applicationId: string) {
     const app = await this.getByIdForBorrower(userId, applicationId);
     if (!["DRAFT", "SUBMITTED", "UNDER_REVIEW"].includes(app.status)) {
@@ -247,6 +273,26 @@ export class ApplicationService {
 
     // Create loan and first disbursement in a transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Re-check status inside the transaction and guard against a duplicate loan.
+      // The status read above happens before the transaction, so two concurrent
+      // approvals (double-click, retry, bulk overlapping a manual approve) could
+      // both pass it and each create a loan. Re-reading here — plus the unique
+      // index on applicationId — makes a second approval a clean error instead.
+      const current = await tx.application.findUnique({
+        where: { id: applicationId },
+        select: { status: true },
+      });
+      if (!current || !["SUBMITTED", "UNDER_REVIEW"].includes(current.status)) {
+        throw ApiError.badRequest("Application is not in a reviewable state");
+      }
+      const existingLoan = await tx.borrowerLoan.findFirst({
+        where: { applicationId },
+        select: { id: true },
+      });
+      if (existingLoan) {
+        throw ApiError.badRequest("This application already has a loan");
+      }
+
       // Update application status
       const updated = await tx.application.update({
         where: { id: applicationId },

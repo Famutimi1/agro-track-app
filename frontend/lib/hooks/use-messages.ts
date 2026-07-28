@@ -31,7 +31,10 @@ export function useMessages(conversationId: string | null, query: { page?: numbe
     queryKey: messageKeys.messages(conversationId || ""),
     queryFn: () => messagesApi.getMessages(conversationId!, query),
     enabled: !!conversationId,
-    refetchInterval: 5000,
+    // Realtime delivery now runs over sockets (message:new) with reconnect
+    // catch-up (conversation:sync), so this poll is only a safety net for the
+    // rare case where a socket event is missed. Lengthened from 5s to cut load.
+    refetchInterval: 20000,
   });
 }
 
@@ -51,11 +54,13 @@ export function useSendMessage() {
       conversationId,
       content,
       channel,
+      clientId,
     }: {
       conversationId: string;
       content: string;
       channel?: MessageChannel;
-    }) => messagesApi.sendMessage(conversationId, content, channel),
+      clientId?: string;
+    }) => messagesApi.sendMessage(conversationId, content, channel, clientId),
     onSuccess: (_, { conversationId }) => {
       queryClient.invalidateQueries({ queryKey: messageKeys.messages(conversationId) });
       queryClient.invalidateQueries({ queryKey: messageKeys.conversations({}) });

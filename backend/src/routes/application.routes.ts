@@ -7,6 +7,7 @@ import { asyncHandler } from "../utils/async-handler";
 import { ApiError } from "../utils/api-error";
 import {
   createApplicationSchema,
+  updateApplicationSchema,
   reviewApplicationSchema,
   listApplicationsSchema,
   approveApplicationSchema,
@@ -55,6 +56,15 @@ router.get(
   authenticate,
   authorize("BORROWER"),
   asyncHandler(ApplicationController.getEligibility)
+);
+
+// Update a draft application's amount/purpose
+router.patch(
+  "/:id",
+  authenticate,
+  authorize("BORROWER"),
+  validate(updateApplicationSchema),
+  asyncHandler(ApplicationController.update)
 );
 
 // Submit draft application

@@ -13,7 +13,7 @@ export const recordPaymentSchema = z.object({
     notes: z.string().max(500).optional(),
   }),
   params: z.object({
-    id: z.string().uuid("Invalid repayment ID"),
+    id: z.string().min(1, "Invalid repayment ID"),
   }),
 });
 
@@ -22,8 +22,8 @@ export const listRepaymentsSchema = z.object({
     page: z.coerce.number().int().positive().optional().default(1),
     limit: z.coerce.number().int().positive().max(100).optional().default(20),
     status: z.enum(["PENDING", "PAID", "OVERDUE", "PARTIAL"]).optional(),
-    loanId: z.string().uuid().optional(),
-    borrowerId: z.string().uuid().optional(),
+    loanId: z.string().min(1).optional(),
+    borrowerId: z.string().min(1).optional(),
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
   }),
