@@ -35,6 +35,27 @@ const statusMap: Record<string, { bg: string; color: string }> = {
   Operational: { bg: "#dcfce7", color: "#16a34a" },
   Degraded: { bg: "#fef3c7", color: "#d97706" },
   Down: { bg: "#fee2e2", color: "#dc2626" },
+  "Not Configured": { bg: "#f3f4f6", color: "#6b7280" },
+  // Transaction statuses
+  Success: { bg: "#dcfce7", color: "#16a34a" },
+  Failed: { bg: "#fee2e2", color: "#dc2626" },
+  Reversed: { bg: "#f3f4f6", color: "#6b7280" },
+  // Document / verification statuses
+  Verified: { bg: "#dcfce7", color: "#16a34a" },
+  Rejected: { bg: "#fee2e2", color: "#dc2626" },
+  Expired: { bg: "#f3f4f6", color: "#6b7280" },
+  // Broadcast statuses
+  Scheduled: { bg: "#dbeafe", color: "#2563eb" },
+  Sending: { bg: "#fef3c7", color: "#d97706" },
+  Sent: { bg: "#dcfce7", color: "#16a34a" },
+  // Billing — invoice statuses
+  Paid: { bg: "#dcfce7", color: "#16a34a" },
+  Overdue: { bg: "#fee2e2", color: "#dc2626" },
+  Void: { bg: "#f3f4f6", color: "#6b7280" },
+  // Billing — subscription statuses
+  "Past Due": { bg: "#fee2e2", color: "#dc2626" },
+  Trialing: { bg: "#dbeafe", color: "#2563eb" },
+  Canceled: { bg: "#f3f4f6", color: "#6b7280" },
 };
 
 export function StatusPill({ status }: { status: string }) {

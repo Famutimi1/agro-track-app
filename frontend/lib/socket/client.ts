@@ -19,6 +19,7 @@ export interface SocketEvents {
   "message:new": (data: Message) => void;
   "message:delivered": (data: { conversationId: string; messageId: string }) => void;
   "message:read": (data: { conversationId: string; messageIds: string[]; readerId: string }) => void;
+  typing: (data: { conversationId: string; userId: string; isTyping: boolean }) => void;
 }
 
 export function getSocket(): Socket | null {
@@ -133,6 +134,12 @@ export function ackMessageDelivered(messageId: string): void {
 // Tell the server this conversation has been read (pushes a live read receipt).
 export function emitConversationRead(conversationId: string): void {
   socket?.emit("message:read", { conversationId });
+}
+
+// Notify the other participant(s) that this user is (or has stopped) typing.
+// Ephemeral — the server relays it to the conversation room without persisting.
+export function emitTyping(conversationId: string, isTyping: boolean): void {
+  socket?.emit(isTyping ? "typing:start" : "typing:stop", { conversationId });
 }
 
 // Reconnect catch-up: ask the server for any messages newer than lastSeq.

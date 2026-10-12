@@ -32,7 +32,7 @@ export default function LoginPage() {
       } else if (["FIELD_AGENT", "FIELD_SUPERVISOR"].includes(role)) {
         router.push("/agent/dashboard");
       } else if (role === "SUPER_ADMIN") {
-        router.push("/admin/dashboard");
+        router.push("/admin/overview");
       } else {
         // All lender roles
         router.push("/lender/dashboard");

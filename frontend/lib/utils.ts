@@ -18,6 +18,23 @@ export function clamp(min: number, max: number): string {
   return `clamp(${min}px, 4vw, ${max}px)`;
 }
 
+// Compact naira formatter: ₦18.4B, ₦142M, ₦750K.
+export function formatCompactCurrency(amount: number): string {
+  const abs = Math.abs(amount);
+  if (abs >= 1e9) return `₦${(amount / 1e9).toFixed(1)}B`;
+  if (abs >= 1e6) return `₦${(amount / 1e6).toFixed(1)}M`;
+  if (abs >= 1e3) return `₦${(amount / 1e3).toFixed(1)}K`;
+  return `₦${amount.toFixed(0)}`;
+}
+
+// Compact plain-number formatter: 87.3K, 1.2M.
+export function formatCompactNumber(num: number): string {
+  const abs = Math.abs(num);
+  if (abs >= 1e6) return `${(num / 1e6).toFixed(1)}M`;
+  if (abs >= 1e3) return `${(num / 1e3).toFixed(1)}K`;
+  return `${num}`;
+}
+
 export function computeProgramMatch(
   program: { requiredScore?: number; targetCrops?: string[]; targetStates?: string[] },
   profile?: { farmScore: number; primaryCrop?: string; secondaryCrops?: string[]; state?: string }

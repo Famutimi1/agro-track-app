@@ -8,6 +8,7 @@ export {
   subscribeToEvent,
   ackMessageDelivered,
   emitConversationRead,
+  emitTyping,
   syncConversation,
   type SocketEvents,
 } from "./client";
@@ -17,6 +18,7 @@ export {
   useSocketRoom,
   useSocketEvent,
   useRealtimeInvalidation,
+  useTypingIndicator,
   useLenderRoom,
   useBorrowerRoom,
   useFieldAgentRoom,

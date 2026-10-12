@@ -16,7 +16,7 @@ import {
   useMarkAllNotificationsAsRead,
 } from "@/lib/hooks";
 import Link from "next/link";
-import { useSocketRoom, useSocketEvent } from "@/lib/socket/hooks";
+import { useSocketRoom, useSocketEvent, useTypingIndicator } from "@/lib/socket/hooks";
 import { useRealtimeStore } from "@/lib/stores";
 import {
   ackMessageDelivered,
@@ -72,6 +72,9 @@ export default function BorrowerMessagesPage() {
 
   useSocketRoom(activeConversationId ? `conversation:${activeConversationId}` : null);
 
+  // Typing indicator for the open conversation.
+  const { isOtherTyping, notifyTyping, stopTyping } = useTypingIndicator(activeConversationId, userId);
+
   const refreshActive = useCallback(() => {
     if (activeConversationId) {
       queryClient.invalidateQueries({ queryKey: messageKeys.messages(activeConversationId) });
@@ -122,6 +125,7 @@ export default function BorrowerMessagesPage() {
 
   const handleSend = () => {
     if (!newMsg.trim() || !activeConversationId) return;
+    stopTyping();
     sendMessage.mutate(
       { conversationId: activeConversationId, content: newMsg.trim() },
       { onSuccess: () => setNewMsg("") }
@@ -354,11 +358,27 @@ export default function BorrowerMessagesPage() {
                 </div>
               )}
 
+              {isOtherTyping && (
+                <div className="px-5 pb-1 -mt-1">
+                  <span className="inline-flex items-center gap-1 text-[11px] text-[var(--muted)] italic">
+                    {otherParty?.firstName || "User"} is typing
+                    <span className="inline-flex gap-0.5">
+                      <span className="w-1 h-1 rounded-full bg-[var(--muted)] animate-bounce [animation-delay:-0.3s]" />
+                      <span className="w-1 h-1 rounded-full bg-[var(--muted)] animate-bounce [animation-delay:-0.15s]" />
+                      <span className="w-1 h-1 rounded-full bg-[var(--muted)] animate-bounce" />
+                    </span>
+                  </span>
+                </div>
+              )}
+
               <div className="p-4 border-t border-[var(--border)] flex gap-2">
                 <Input
                   placeholder="Type a message..."
                   value={newMsg}
-                  onChange={(e) => setNewMsg(e.target.value)}
+                  onChange={(e) => {
+                    setNewMsg(e.target.value);
+                    notifyTyping();
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();

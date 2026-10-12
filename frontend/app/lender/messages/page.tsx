@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -42,7 +42,7 @@ import {
 import { usePrograms } from "@/lib/hooks/use-programs";
 import { useBorrowers } from "@/lib/hooks/use-borrowers";
 import { messageKeys, useCreateConversationWithBorrower } from "@/lib/hooks/use-messages";
-import { useSocketRoom, useSocketEvent } from "@/lib/socket/hooks";
+import { useSocketRoom, useSocketEvent, useTypingIndicator } from "@/lib/socket/hooks";
 import { useRealtimeStore, useAuthStore } from "@/lib/stores";
 import { ackMessageDelivered, emitConversationRead, syncConversation } from "@/lib/socket";
 import {
@@ -60,7 +60,13 @@ type Tab = "conversations" | "broadcast" | "templates";
 export default function MessagesPage() {
   const [activeTab, setActiveTab] = useState<Tab>("conversations");
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+  // Source of truth is the conversation ID; the conversation object itself is
+  // derived from the live conversations query below so its `unreadCount` (and
+  // other fields) stay fresh as messages arrive. `pendingConversation` is a
+  // fallback so a freshly-created conversation renders before the list refetch
+  // includes it.
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [pendingConversation, setPendingConversation] = useState<Conversation | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -72,7 +78,7 @@ export default function MessagesPage() {
   const targetConversationId = searchParams.get("conversationId");
 
   const { data: conversationsData, isLoading: convoLoading } = useConversations({ search: searchQuery });
-  const { data: messagesData, isLoading: msgsLoading } = useMessages(activeConversation?.id || null);
+  const { data: messagesData, isLoading: msgsLoading } = useMessages(activeConversationId);
   const { data: templates } = useMessageTemplates();
   const { data: broadcastsData } = useBroadcasts();
   const { data: programsData } = usePrograms({ limit: 100 });
@@ -81,55 +87,71 @@ export default function MessagesPage() {
   const markAsRead = useMarkAsRead();
 
   const conversations = conversationsData?.data || [];
+  // Always resolve the active conversation from the live list so its
+  // `unreadCount` reflects newly-arrived messages; fall back to the pending
+  // (just-created) one until the list refetch includes it.
+  const activeConversation =
+    conversations.find((c) => c.id === activeConversationId) ||
+    (pendingConversation?.id === activeConversationId ? pendingConversation : null);
   // Order by seq (monotonic per-conversation) so messages never render out of
   // order regardless of fetch/socket timing. Falls back to createdAt for any
   // legacy rows without a seq.
-  const messages = [...(messagesData?.data || [])].sort((a: Message, b: Message) => {
-    const sa = a.seq != null ? Number(a.seq) : 0;
-    const sb = b.seq != null ? Number(b.seq) : 0;
-    if (sa !== sb) return sa - sb;
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-  });
+  const messages = useMemo(
+    () =>
+      [...(messagesData?.data || [])].sort((a: Message, b: Message) => {
+        const sa = a.seq != null ? Number(a.seq) : 0;
+        const sb = b.seq != null ? Number(b.seq) : 0;
+        if (sa !== sb) return sa - sb;
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }),
+    [messagesData]
+  );
   const broadcasts = broadcastsData?.data || [];
   const programs = programsData?.data || [];
 
   // Auto-open a conversation when arriving via ?conversationId= (e.g. from the
   // "Message" button on a borrower's profile).
   useEffect(() => {
-    if (targetConversationId && !activeConversation && conversations.length > 0) {
+    if (targetConversationId && !activeConversationId && conversations.length > 0) {
       const match = conversations.find((c) => c.id === targetConversationId);
       if (match) {
         setActiveTab("conversations");
-        setActiveConversation(match);
+        setActiveConversationId(match.id);
       }
     }
-  }, [targetConversationId, activeConversation, conversations]);
+  }, [targetConversationId, activeConversationId, conversations]);
 
   // Realtime: join the active conversation room and refresh on incoming messages.
-  useSocketRoom(activeConversation ? `conversation:${activeConversation.id}` : null);
+  useSocketRoom(activeConversationId ? `conversation:${activeConversationId}` : null);
 
   const isConnected = useRealtimeStore((s) => s.isConnected);
   const userId = useAuthStore((s) => s.user?.id);
 
+  // Typing indicator for the open conversation.
+  const { isOtherTyping, notifyTyping, stopTyping } = useTypingIndicator(
+    activeConversationId,
+    userId
+  );
+
   const refreshActive = useCallback(() => {
-    if (activeConversation) {
-      queryClient.invalidateQueries({ queryKey: messageKeys.messages(activeConversation.id) });
+    if (activeConversationId) {
+      queryClient.invalidateQueries({ queryKey: messageKeys.messages(activeConversationId) });
     }
     queryClient.invalidateQueries({ queryKey: messageKeys.conversations({}) });
-  }, [activeConversation, queryClient]);
+  }, [activeConversationId, queryClient]);
 
   const handleNewMessage = useCallback(
     (data: Message) => {
-      if (activeConversation && data.conversationId === activeConversation.id) {
+      if (activeConversationId && data.conversationId === activeConversationId) {
         // Delivered receipt: confirm receipt of the other party's message.
         if (userId && data.senderId !== userId) {
           ackMessageDelivered(data.id);
         }
-        queryClient.invalidateQueries({ queryKey: messageKeys.messages(activeConversation.id) });
+        queryClient.invalidateQueries({ queryKey: messageKeys.messages(activeConversationId) });
       }
       queryClient.invalidateQueries({ queryKey: messageKeys.conversations({}) });
     },
-    [activeConversation, queryClient, userId]
+    [activeConversationId, queryClient, userId]
   );
   useSocketEvent("message:new", handleNewMessage);
 
@@ -140,22 +162,25 @@ export default function MessagesPage() {
   // Reconnect catch-up: pull anything newer than the last seq we hold for the
   // open conversation when the socket (re)connects.
   useEffect(() => {
-    if (!isConnected || !activeConversation) return;
+    if (!isConnected || !activeConversationId) return;
     const lastSeq = messages.length ? Number(messages[messages.length - 1].seq ?? 0) : 0;
-    syncConversation(activeConversation.id, lastSeq).then((missed) => {
+    syncConversation(activeConversationId, lastSeq).then((missed) => {
       if (missed.length > 0) refreshActive();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected, activeConversation?.id]);
+  }, [isConnected, activeConversationId]);
 
+  // Mark inbound messages read whenever the open conversation has unread ones —
+  // this fires both on open AND when new messages arrive while it stays open,
+  // so the sender's ticks turn blue live. Depends on unreadCount, not just id.
   useEffect(() => {
-    if (activeConversation && activeConversation.unreadCount > 0) {
-      markAsRead.mutate(activeConversation.id);
+    if (activeConversationId && (activeConversation?.unreadCount ?? 0) > 0) {
+      markAsRead.mutate(activeConversationId);
       // Live read receipt over the socket so the sender's ticks turn blue now.
-      emitConversationRead(activeConversation.id);
+      emitConversationRead(activeConversationId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeConversation?.id]);
+  }, [activeConversationId, activeConversation?.unreadCount]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -168,7 +193,8 @@ export default function MessagesPage() {
       const conversation = await createConversation.mutateAsync(borrowerId);
       setShowNewConvoModal(false);
       setActiveTab("conversations");
-      setActiveConversation(conversation);
+      setPendingConversation(conversation);
+      setActiveConversationId(conversation.id);
     } catch {
       // surfaced by the mutation state in the modal
     }
@@ -183,6 +209,7 @@ export default function MessagesPage() {
         content: newMessage.trim(),
       });
       setNewMessage("");
+      stopTyping();
     } catch (error) {
       console.error("Failed to send message:", error);
     }
@@ -210,16 +237,22 @@ export default function MessagesPage() {
     return d.toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
+  // Blue double-tick once the message is read. The REST read path sets
+  // `read=true` without necessarily advancing `status` to READ, so honor either
+  // signal (matches the borrower side).
+  const getStatusIcon = (m: Message) => {
+    if (m.read || m.status === "READ") {
+      return <CheckCheck size={12} className="text-blue-500" />;
+    }
+    switch (m.status) {
       case "SENT":
-        return <Check size={12} className="text-[var(--muted)]" />;
+        return <Check size={12} className="text-white/60" />;
       case "DELIVERED":
-        return <CheckCheck size={12} className="text-[var(--muted)]" />;
-      case "READ":
-        return <CheckCheck size={12} className="text-blue-500" />;
+        return <CheckCheck size={12} className="text-white/60" />;
+      case "FAILED":
+        return <span className="text-[10px] text-red-300">!</span>;
       default:
-        return <Clock size={12} className="text-[var(--muted)]" />;
+        return <Clock size={12} className="text-white/60" />;
     }
   };
 
@@ -295,7 +328,7 @@ export default function MessagesPage() {
                 conversations.map((c) => (
                   <button
                     key={c.id}
-                    onClick={() => setActiveConversation(c)}
+                    onClick={() => setActiveConversationId(c.id)}
                     className={`w-full text-left px-4 py-3 border-b border-[var(--border)] transition-colors cursor-pointer ${
                       activeConversation?.id === c.id
                         ? "bg-[var(--primary)]/5 border-l-2 border-l-[var(--primary)]"
@@ -391,7 +424,7 @@ export default function MessagesPage() {
                     </div>
                   ) : (
                     messages.map((m) => {
-                      const isMe = m.sender.role !== "BORROWER";
+                      const isMe = m.senderId === userId;
                       return (
                         <div key={m.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                           <div
@@ -414,7 +447,7 @@ export default function MessagesPage() {
                               >
                                 {formatTime(m.createdAt)}
                               </span>
-                              {isMe && getStatusIcon(m.status)}
+                              {isMe && getStatusIcon(m)}
                             </div>
                           </div>
                         </div>
@@ -424,11 +457,27 @@ export default function MessagesPage() {
                   <div ref={messagesEndRef} />
                 </div>
 
+                {isOtherTyping && (
+                  <div className="px-5 pb-1 -mt-1">
+                    <span className="inline-flex items-center gap-1 text-[11px] text-[var(--muted)] italic">
+                      {activeConversation?.otherParticipant?.firstName || "User"} is typing
+                      <span className="inline-flex gap-0.5">
+                        <span className="w-1 h-1 rounded-full bg-[var(--muted)] animate-bounce [animation-delay:-0.3s]" />
+                        <span className="w-1 h-1 rounded-full bg-[var(--muted)] animate-bounce [animation-delay:-0.15s]" />
+                        <span className="w-1 h-1 rounded-full bg-[var(--muted)] animate-bounce" />
+                      </span>
+                    </span>
+                  </div>
+                )}
+
                 <div className="p-4 border-t border-[var(--border)] flex gap-2">
                   <Input
                     placeholder="Type a message..."
                     value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    onChange={(e) => {
+                      setNewMessage(e.target.value);
+                      notifyTyping();
+                    }}
                     onKeyPress={handleKeyPress}
                     className="flex-1"
                   />

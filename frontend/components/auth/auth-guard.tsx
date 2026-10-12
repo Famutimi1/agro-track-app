@@ -20,7 +20,9 @@ export function AuthGuard({
   const { user, isAuthenticated, isLoading, refreshUser } = useAuthStore();
 
   useEffect(() => {
-    refreshUser();
+    // Force a server refresh so role changes (e.g. a DB/admin promotion)
+    // are picked up instead of trusting the stale role from localStorage.
+    refreshUser(true);
   }, [refreshUser]);
 
   useEffect(() => {

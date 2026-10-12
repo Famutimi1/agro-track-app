@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\({scripts:p.scripts, prisma:p.prisma},null,2\\)\\)\")",
+      "mcp__pencil__get_screenshot",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(cd /e/repos/Downloads/feature-store/backend && npx tsc --noEmit 2>&1 | grep -v \"test-utils\" | head -40)",
+      "Read(//e/repos/Downloads/feature-store/**)"
+    ]
+  }
+}

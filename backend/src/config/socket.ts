@@ -180,6 +180,32 @@ export function initializeSocket(httpServer: HttpServer): Server {
       }
     );
 
+    // ── Typing indicators (ephemeral; nothing persisted) ─────────────────────
+    // Relay typing state to the OTHER participants of a conversation. Room
+    // membership is the authorization signal: a socket is only in
+    // `conversation:<id>` if canJoinRoom admitted it (participant check), so we
+    // relay only when the socket already belongs to the room — no extra DB hit
+    // per keystroke. socket.to(room) excludes the sender, so a user never sees
+    // their own typing echoed back.
+    const relayTyping = (conversationId: unknown, isTyping: boolean) => {
+      if (typeof conversationId !== "string" || !conversationId) return;
+      const room = `conversation:${conversationId}`;
+      if (!socket.rooms.has(room)) return;
+      socket.to(room).emit("typing", {
+        conversationId,
+        userId: socket.userId,
+        isTyping,
+      });
+    };
+
+    socket.on("typing:start", (payload: { conversationId?: string }) => {
+      relayTyping(payload?.conversationId, true);
+    });
+
+    socket.on("typing:stop", (payload: { conversationId?: string }) => {
+      relayTyping(payload?.conversationId, false);
+    });
+
     // Generic room join/leave used by frontend hooks (e.g. conversation:*,
     // lender:*, borrower:*, agent:*). Authorization is enforced here: with the
     // Redis adapter live, joining a room is enough to receive everything emitted
