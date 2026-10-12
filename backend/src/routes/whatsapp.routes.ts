@@ -29,13 +29,9 @@ router.post(
   asyncHandler(async (req, res) => {
     const signature = req.headers["x-hub-signature-256"] as string;
 
-    // Verify signature in production
-    if (process.env.NODE_ENV === "production" && signature) {
-      const payload = JSON.stringify(req.body);
-      if (!WhatsAppService.verifySignature(payload, signature)) {
-        logger.warn("Invalid WhatsApp webhook signature");
-        return res.sendStatus(401);
-      }
+    if (!signature || !req.rawBody || !WhatsAppService.verifySignature(req.rawBody, signature)) {
+      logger.warn("Invalid WhatsApp webhook signature");
+      return res.sendStatus(401);
     }
 
     await WhatsAppService.handleWebhook(req.body);

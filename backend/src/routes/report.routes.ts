@@ -2,6 +2,9 @@ import { Router } from "express";
 import { authenticate, authorize } from "../middlewares/auth";
 import { asyncHandler } from "../utils/async-handler";
 import { ReportService } from "../services/report.service";
+import { ProgramService } from "../services/program.service";
+import { BorrowerService } from "../services/borrower.service";
+import { ApiError } from "../utils/api-error";
 
 const router = Router();
 
@@ -33,6 +36,8 @@ router.get(
   authorize("LENDER_ADMIN", "LENDER_MANAGER", "LENDER_ANALYST"),
   asyncHandler(async (req, res) => {
     const range = parseDateRange(req.query);
+    if (!req.user!.lenderId) throw ApiError.forbidden();
+    await ProgramService.getById(req.params.programId, req.user!.lenderId);
     const report = await ReportService.getProgramReport(req.params.programId, range);
     res.json({ success: true, data: report });
   })
@@ -56,7 +61,9 @@ router.get(
   authorize("LENDER_ADMIN", "LENDER_MANAGER", "LENDER_ANALYST"),
   asyncHandler(async (req, res) => {
     const range = parseDateRange(req.query);
-    const report = await ReportService.getBorrowerStatement(req.params.borrowerId, range);
+    if (!req.user!.lenderId) throw ApiError.forbidden();
+    await BorrowerService.getByIdForLender(req.params.borrowerId, req.user!.lenderId);
+    const report = await ReportService.getBorrowerStatement(req.params.borrowerId, range, req.user!.lenderId);
     res.json({ success: true, data: report });
   })
 );

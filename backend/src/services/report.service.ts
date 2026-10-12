@@ -162,7 +162,7 @@ export class ReportService {
   }
 
   // Borrower Statement
-  static async getBorrowerStatement(borrowerId: string, range: DateRange) {
+  static async getBorrowerStatement(borrowerId: string, range: DateRange, lenderOrgId: string) {
     const { startDate, endDate } = range;
 
     const borrower = await prisma.borrowerProfile.findUnique({
@@ -176,7 +176,7 @@ export class ReportService {
     if (!borrower) throw ApiError.notFound("Borrower not found");
 
     const loans = await prisma.borrowerLoan.findMany({
-      where: { borrowerId },
+      where: { borrowerId, program: { lenderOrgId } },
       include: {
         program: { select: { name: true, lenderOrg: { select: { name: true } } } },
         disbursements: {

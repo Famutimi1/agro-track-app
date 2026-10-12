@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from "express";
-import { ZodSchema } from "zod";
+import { ZodObject, ZodSchema } from "zod";
 import { ApiError } from "../utils/api-error";
 
 export function validate(schema: ZodSchema, source: "body" | "query" | "params" = "body") {
   return (req: Request, _res: Response, next: NextFunction) => {
-    const result = schema.safeParse(req[source]);
+    const structured = schema instanceof ZodObject && ["body", "query", "params"].some(key => key in schema.shape);
+    const result = schema.safeParse(structured ? { body: req.body, query: req.query, params: req.params } : req[source]);
 
     if (!result.success) {
       const errors = result.error.flatten().fieldErrors;
@@ -14,7 +15,11 @@ export function validate(schema: ZodSchema, source: "body" | "query" | "params" 
       throw ApiError.badRequest(`Validation failed: ${message}`);
     }
 
-    req[source] = result.data;
+    if (structured) {
+      for (const key of ["body", "query", "params"] as const) {
+        if (result.data[key] !== undefined) req[key] = result.data[key];
+      }
+    } else req[source] = result.data;
     next();
   };
 }

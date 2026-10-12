@@ -21,6 +21,7 @@ export interface Application {
     user: { firstName: string; lastName: string; email: string };
   };
   documents?: any[];
+  loans?: { id: string; status: string }[];
 }
 
 export interface CreateApplicationRequest {
@@ -85,12 +86,12 @@ export const applicationsApi = {
   },
 
   approve: async (id: string, approvedAmount: number, notes?: string) => {
-    const res = await api.patch<ApiResponse<Application>>(`/applications/${id}/approve`, { approvedAmount, notes });
+    const res = await api.patch<ApiResponse<Application>>(`/applications/${id}/review`, { status: "APPROVED", notes });
     return res.data.data;
   },
 
   reject: async (id: string, reason: string) => {
-    const res = await api.patch<ApiResponse<Application>>(`/applications/${id}/reject`, { rejectionReason: reason });
+    const res = await api.patch<ApiResponse<Application>>(`/applications/${id}/review`, { status: "REJECTED", rejectionReason: reason });
     return res.data.data;
   },
 

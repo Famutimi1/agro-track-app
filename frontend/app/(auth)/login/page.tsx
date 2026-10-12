@@ -7,13 +7,15 @@ import { Eye, Lock, Mail, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { roleHome } from "@/lib/stores/auth.store";
 import { useAuthStore } from "@/lib/stores";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const { login, isLoading, twoFactorRequired, error, clearError } = useAuthStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -23,8 +25,8 @@ export default function LoginPage() {
     if (!email || !password) return;
 
     try {
-      await login(email, password);
-      router.push("/dashboard");
+      const authenticated = await login(email, password, twoFactorRequired ? code : undefined);
+      if (authenticated) router.replace(roleHome(useAuthStore.getState().user!.role));
     } catch {
       // Error is handled in store
     }
@@ -34,11 +36,11 @@ export default function LoginPage() {
     <Card className="p-8">
       <h1 className="text-xl font-bold text-[var(--text)] mb-1">Welcome back</h1>
       <p className="text-sm text-[var(--muted)] mb-6">
-        Sign in to your lender dashboard
+        Sign in to your AgroTrack account
       </p>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+        <div id="login-error" role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
           {error}
         </div>
       )}
@@ -91,11 +93,12 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {twoFactorRequired && <div>
+          <label htmlFor="two-factor-code" className="text-xs font-semibold mb-1.5 block">Authenticator code</label>
+          <Input id="two-factor-code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ""))} placeholder="6-digit code" required disabled={isLoading} />
+        </div>}
         <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 text-xs text-[var(--muted)] cursor-pointer">
-            <input type="checkbox" className="rounded" />
-            Remember me
-          </label>
+          <span className="text-xs text-[var(--muted)]">Secure sign-in</span>
           <Link href="/forgot-password" className="text-xs text-brand-green font-semibold hover:underline">
             Forgot password?
           </Link>

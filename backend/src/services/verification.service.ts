@@ -28,6 +28,7 @@ export class VerificationService {
   private static NIN_CACHE_TTL = 24 * 60 * 60;
 
   static async verifyBvn(bvn: string, borrowerId: string): Promise<BvnData> {
+    if (process.env.NODE_ENV === "production") throw new ApiError(503, "A real identity verification provider is required");
     const cacheKey = `bvn:${bvn}`;
 
     // Check cache
@@ -56,6 +57,7 @@ export class VerificationService {
   }
 
   static async verifyNin(nin: string, borrowerId: string): Promise<NinData> {
+    if (process.env.NODE_ENV === "production") throw new ApiError(503, "A real identity verification provider is required");
     const cacheKey = `nin:${nin}`;
 
     const cached = await redis.get(cacheKey);

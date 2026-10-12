@@ -100,8 +100,6 @@ export default function RegisterPage() {
     try {
       const response = await authApi.registerBorrower(formData);
 
-      localStorage.setItem("accessToken", response.accessToken);
-      localStorage.setItem("refreshToken", response.refreshToken);
       setUser(response.user);
 
       setStep(steps.length);

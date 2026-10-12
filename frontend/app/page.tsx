@@ -208,6 +208,7 @@ export default function LandingPage() {
                 <Button
                   variant={p.hot ? "primary" : "secondary"}
                   className="w-full"
+                  onClick={() => { window.location.href = p.plan === "Enterprise" ? "/contact" : "/signup"; }}
                 >
                   {p.plan === "Enterprise" ? "Contact Sales" : "Start Free Trial"}
                 </Button>

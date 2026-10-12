@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LenderSidebar } from "@/components/layout/lender-sidebar";
 import { LenderTopbar } from "@/components/layout/lender-topbar";
 import { LenderGuard } from "@/components/auth";
@@ -10,13 +10,14 @@ export default function LenderLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  useEffect(() => { setSidebarOpen(window.matchMedia("(min-width: 1024px)").matches); }, []);
 
   return (
     <LenderGuard>
       <div className="flex min-h-screen bg-[var(--background)]">
         <LenderSidebar open={sidebarOpen} />
-        <div className="flex-1 flex flex-col min-h-screen">
+        <div className="min-w-0 flex-1 flex flex-col min-h-screen">
           <LenderTopbar
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}

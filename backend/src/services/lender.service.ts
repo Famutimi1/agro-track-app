@@ -21,8 +21,8 @@ export class LenderService {
   }
 
   static async getDashboardStats(lenderId: string) {
-    const [totalBorrowers, activeLoans, totalDisbursed, repaymentsDue] = await Promise.all([
-      prisma.borrowerLoan.count({ where: { program: { lenderOrgId: lenderId } } }),
+    const [totalBorrowers, activeLoans, totalDisbursed, repaymentsDue, totalRepaid, programCount, applicationsPending] = await Promise.all([
+      prisma.borrowerProfile.count({ where: { loans: { some: { program: { lenderOrgId: lenderId } } } } }),
       prisma.borrowerLoan.count({ where: { program: { lenderOrgId: lenderId }, status: "ACTIVE" } }),
       prisma.disbursement.aggregate({
         where: { loan: { program: { lenderOrgId: lenderId } }, status: "COMPLETED" },
@@ -32,6 +32,9 @@ export class LenderService {
         where: { loan: { program: { lenderOrgId: lenderId } }, status: "PENDING" },
         _sum: { amount: true },
       }),
+      prisma.borrowerLoan.aggregate({ where: { program: { lenderOrgId: lenderId } }, _sum: { amountPaid: true } }),
+      prisma.program.count({ where: { lenderOrgId: lenderId } }),
+      prisma.application.count({ where: { program: { lenderOrgId: lenderId }, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } }),
     ]);
 
     return {
@@ -39,6 +42,9 @@ export class LenderService {
       activeLoans,
       totalDisbursed: totalDisbursed._sum.amount || 0,
       repaymentsDue: repaymentsDue._sum.amount || 0,
+      totalRepaid: totalRepaid._sum.amountPaid || 0,
+      programCount,
+      applicationsPending,
     };
   }
 

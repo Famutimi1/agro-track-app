@@ -30,15 +30,11 @@ export function initSocket(serverUrl?: string): Socket | null {
     return socket;
   }
 
-  const url = serverUrl || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-  const token = localStorage.getItem("accessToken");
-
-  if (!token) {
-    return null;
-  }
+  if (socket) return socket;
+  const url = serverUrl || process.env.NEXT_PUBLIC_WS_URL || new URL(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").origin;
 
   socket = io(url, {
-    auth: { token },
+    withCredentials: true,
     transports: ["websocket", "polling"],
     reconnection: true,
     reconnectionAttempts: 10,

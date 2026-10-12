@@ -46,7 +46,7 @@ export interface TeamMember {
 
 export const lendersApi = {
   getMyOrganization: async () => {
-    const res = await api.get<ApiResponse<LenderOrganization>>("/lenders/me");
+    const res = await api.get<ApiResponse<LenderOrganization>>("/lenders/organization");
     return res.data.data;
   },
 
@@ -58,17 +58,17 @@ export const lendersApi = {
     website: string;
     logoUrl: string;
   }>) => {
-    const res = await api.patch<ApiResponse<LenderOrganization>>("/lenders/me", data);
+    const res = await api.patch<ApiResponse<LenderOrganization>>("/lenders/organization", data);
     return res.data.data;
   },
 
   getDashboard: async () => {
-    const res = await api.get<ApiResponse<DashboardStats>>("/lenders/me/dashboard");
+    const res = await api.get<ApiResponse<DashboardStats>>("/lenders/dashboard");
     return res.data.data;
   },
 
   getTeamMembers: async () => {
-    const res = await api.get<ApiResponse<TeamMember[]>>("/lenders/me/team");
+    const res = await api.get<ApiResponse<TeamMember[]>>("/lenders/team");
     return res.data.data;
   },
 
@@ -78,7 +78,7 @@ export const lendersApi = {
     lastName: string;
     role: "LENDER_MANAGER" | "LENDER_VIEWER" | "LENDER_ANALYST";
   }) => {
-    const res = await api.post<ApiResponse<TeamMember>>("/lenders/me/team", data);
+    const res = await api.post<ApiResponse<TeamMember>>("/lenders/team", data);
     return res.data.data;
   },
 

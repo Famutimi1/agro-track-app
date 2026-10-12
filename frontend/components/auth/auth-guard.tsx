@@ -17,11 +17,7 @@ export function AuthGuard({
 }: AuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isAuthenticated, isLoading, refreshUser } = useAuthStore();
-
-  useEffect(() => {
-    refreshUser();
-  }, [refreshUser]);
+  const { user, isAuthenticated, isLoading } = useAuthStore();
 
   useEffect(() => {
     if (isLoading) return;

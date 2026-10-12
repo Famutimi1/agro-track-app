@@ -35,7 +35,7 @@ export class WhatsAppService {
   private static appSecret = process.env.WHATSAPP_APP_SECRET;
 
   static verifyWebhook(mode: string, token: string, challenge: string): string | null {
-    if (mode === "subscribe" && token === this.verifyToken) {
+    if (this.verifyToken && mode === "subscribe" && token === this.verifyToken) {
       return challenge;
     }
     return null;
@@ -49,7 +49,8 @@ export class WhatsAppService {
       .update(payload)
       .digest("hex");
 
-    return `sha256=${expectedSig}` === signature;
+    const expected = `sha256=${expectedSig}`;
+    return Buffer.byteLength(expected) === Buffer.byteLength(signature) && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
   }
 
   static async handleWebhook(data: WhatsAppWebhook): Promise<void> {

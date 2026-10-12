@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const approveDisbursementSchema = z.object({
   params: z.object({
-    id: z.string().uuid("Invalid disbursement ID"),
+    id: z.string().min(1).max(100),
   }),
   body: z
     .object({
@@ -13,7 +13,7 @@ export const approveDisbursementSchema = z.object({
 
 export const rejectDisbursementSchema = z.object({
   params: z.object({
-    id: z.string().uuid("Invalid disbursement ID"),
+    id: z.string().min(1).max(100),
   }),
   body: z.object({
     reason: z
@@ -25,7 +25,7 @@ export const rejectDisbursementSchema = z.object({
 
 export const processDisbursementSchema = z.object({
   params: z.object({
-    id: z.string().uuid("Invalid disbursement ID"),
+    id: z.string().min(1).max(100),
   }),
   body: z.object({
     paymentRef: z
@@ -40,13 +40,13 @@ export const listDisbursementsSchema = z.object({
     page: z.coerce.number().int().positive().optional().default(1),
     limit: z.coerce.number().int().positive().max(100).optional().default(20),
     status: z.enum(["PENDING", "APPROVED", "PROCESSING", "COMPLETED", "FAILED"]).optional(),
-    loanId: z.string().uuid().optional(),
+    loanId: z.string().min(1).max(100).optional(),
   }),
 });
 
 export const getTrancheStatusSchema = z.object({
   params: z.object({
-    loanId: z.string().uuid("Invalid loan ID"),
+    loanId: z.string().min(1).max(100),
   }),
 });
 

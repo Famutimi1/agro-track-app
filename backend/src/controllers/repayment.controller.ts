@@ -10,9 +10,9 @@ export const getRepayments = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const recordPayment = asyncHandler(async (req: Request, res: Response) => {
-  const { amount, method } = req.body;
+  const { amount, method, paymentRef } = req.body;
   if (!amount || !method) throw ApiError.badRequest("Amount and method are required");
-  const repayment = await RepaymentService.recordPayment(req.params.id, amount, method);
+  const repayment = await RepaymentService.recordPayment(req.params.id, amount, method, paymentRef, req.user!.lenderId!);
   res.json({ success: true, data: repayment });
 });
 

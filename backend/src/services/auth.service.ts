@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { TOTP, generateSecret, verify } from "otplib";
+import { generateSecret, verify } from "otplib";
 import * as QRCode from "qrcode";
 import { env } from "../config/env";
 import { prisma } from "../config/prisma";
@@ -23,8 +23,8 @@ export class AuthService {
     return bcrypt.compare(password, hash);
   }
 
-  static generateAccessToken(payload: { sub: string; email: string; role: Role; lenderId?: string }): string {
-    return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions);
+  static generateAccessToken(payload: { sub: string; email: string; role: Role; lenderId?: string; sid?: string }): string {
+    return jwt.sign(payload, env.JWT_SECRET, { algorithm: "HS256", expiresIn: "15m" });
   }
 
   static generateRefreshToken(): string {
@@ -37,14 +37,14 @@ export class AuthService {
     expiresAt.setDate(expiresAt.getDate() + 7);
 
     await prisma.refreshToken.create({
-      data: { token, userId, expiresAt },
+      data: { token: this.hashToken(token), userId, expiresAt },
     });
 
     return token;
   }
 
   static async revokeRefreshToken(token: string): Promise<void> {
-    await prisma.refreshToken.deleteMany({ where: { token } });
+    await prisma.refreshToken.deleteMany({ where: { token: this.hashToken(token) } });
   }
 
   static async revokeAllUserTokens(userId: string): Promise<void> {
@@ -54,11 +54,11 @@ export class AuthService {
 
   static async validateRefreshToken(token: string) {
     const stored = await prisma.refreshToken.findUnique({
-      where: { token },
+      where: { token: this.hashToken(token) },
       include: { user: true },
     });
 
-    if (!stored || stored.expiresAt < new Date()) {
+    if (!stored || stored.expiresAt <= new Date() || !stored.user.isActive) {
       if (stored) await prisma.refreshToken.delete({ where: { id: stored.id } });
       throw ApiError.unauthorized("Invalid or expired refresh token");
     }
@@ -67,16 +67,29 @@ export class AuthService {
   }
 
   static async rotateRefreshToken(oldToken: string, userId: string): Promise<string> {
-    // Delete old token
-    await prisma.refreshToken.deleteMany({ where: { token: oldToken } });
+    const token = this.generateRefreshToken();
+    const changed = await prisma.refreshToken.updateMany({
+      where: { token: this.hashToken(oldToken), userId, expiresAt: { gt: new Date() }, user: { isActive: true } },
+      data: { token: this.hashToken(token), expiresAt: new Date(Date.now() + 7 * 86400000) },
+    });
+    if (changed.count !== 1) throw ApiError.unauthorized("Invalid or already used refresh token");
+    return token;
+  }
 
-    // Create new one
-    return this.createRefreshToken(userId);
+  static hashToken(token: string): string {
+    return crypto.createHash("sha256").update(token).digest("hex");
+  }
+
+  static async issueSession(user: { id: string; email: string; role: Role; lenderOrgId?: string | null }) {
+    const refreshToken = await this.createRefreshToken(user.id);
+    const session = await prisma.refreshToken.findUniqueOrThrow({ where: { token: this.hashToken(refreshToken) } });
+    const accessToken = this.generateAccessToken({ sub: user.id, email: user.email, role: user.role, lenderId: user.lenderOrgId || undefined, sid: session.id });
+    return { accessToken, refreshToken };
   }
 
   // OTP Methods
   static generateOtp(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return crypto.randomInt(100000, 1000000).toString();
   }
 
   static async sendOtp(phone: string, purpose: "LOGIN" | "VERIFY" | "RESET"): Promise<void> {
@@ -86,7 +99,7 @@ export class AuthService {
     await redis.setex(key, OTP_EXPIRY, otp);
 
     // In production, send via SMS
-    logger.info("OTP generated", { phone: phone.slice(0, 4) + "****", purpose, otp: env.NODE_ENV === "development" ? otp : "***" });
+    logger.info("OTP generated", { phone: phone.slice(0, 4) + "****", purpose });
 
     // Queue SMS
     const { smsQueue } = await import("../config/queue");
@@ -109,8 +122,6 @@ export class AuthService {
   }
 
   // 2FA TOTP Methods
-  private static totp = new TOTP({ digits: 6, period: 30 });
-
   private static async verifyTOTP(token: string, secret: string): Promise<boolean> {
     try {
       const result = await verify({ token, secret });
@@ -275,6 +286,8 @@ export class AuthService {
 
   // Phone Verification
   static async verifyPhone(userId: string, phone: string, otp: string): Promise<void> {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true } });
+    if (user?.phone !== phone) throw ApiError.badRequest("Phone must match your profile");
     const isValid = await this.verifyOtp(phone, otp, "VERIFY");
     if (!isValid) throw ApiError.badRequest("Invalid or expired OTP");
 

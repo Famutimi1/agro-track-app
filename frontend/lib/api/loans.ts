@@ -22,6 +22,8 @@ export interface Loan {
     user: { firstName: string; lastName: string; phone: string };
   };
   program?: { name: string };
+  disbursements?: Disbursement[];
+  repayments?: Repayment[];
 }
 
 export interface Disbursement {
@@ -129,8 +131,8 @@ export const repaymentsApi = {
     return res.data.data;
   },
 
-  record: async (id: string, amount: number, method: string) => {
-    const res = await api.post<ApiResponse<Repayment>>(`/repayments/${id}/record`, { amount, method });
+  record: async (id: string, amount: number, method: string, paymentRef: string) => {
+    const res = await api.patch<ApiResponse<Repayment>>(`/repayments/${id}/pay`, { amount, method, paymentRef });
     return res.data.data;
   },
 };

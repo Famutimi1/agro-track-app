@@ -114,8 +114,8 @@ export function useRecordRepayment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, amount, method }: { id: string; amount: number; method: string }) =>
-      repaymentsApi.record(id, amount, method),
+    mutationFn: ({ id, amount, method, paymentRef }: { id: string; amount: number; method: string; paymentRef: string }) =>
+      repaymentsApi.record(id, amount, method, paymentRef),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: repaymentKeys.lists() });
       queryClient.invalidateQueries({ queryKey: repaymentKeys.mine() });

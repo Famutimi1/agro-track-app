@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.NODE_ENV === "production") throw new Error("Demo seeds must not be run in production");
   console.log("🌱 Seeding database...");
 
   const passwordHash = await bcrypt.hash("password123", 12);

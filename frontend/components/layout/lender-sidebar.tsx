@@ -6,6 +6,7 @@ import {
   FileText, Wallet,
 } from "lucide-react";
 import Link from "next/link";
+import { useAuthStore } from "@/lib/stores";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +31,7 @@ interface LenderSidebarProps {
 }
 
 export function LenderSidebar({ open }: LenderSidebarProps) {
+  const { user } = useAuthStore();
   const pathname = usePathname();
 
   return (
@@ -56,6 +58,8 @@ export function LenderSidebar({ open }: LenderSidebarProps) {
           return (
             <Link
               key={label}
+              aria-label={label}
+              title={label}
               href={href}
               className={cn(
                 "flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-[13px] whitespace-nowrap transition-colors",
@@ -75,13 +79,13 @@ export function LenderSidebar({ open }: LenderSidebarProps) {
         <div className="px-4 py-3 border-t border-white/10">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-brand-gold flex items-center justify-center text-brand-green font-bold text-xs flex-shrink-0">
-              FM
+              {user?.firstName?.[0]}{user?.lastName?.[0]}
             </div>
             <div>
               <p className="text-white text-xs font-semibold whitespace-nowrap">
-                Fed. Min. of Agriculture
+                {user?.lenderOrg?.name || `${user?.firstName || ""} ${user?.lastName || ""}`}
               </p>
-              <p className="text-white/45 text-[11px]">Admin Account</p>
+              <p className="text-white/45 text-[11px]">{user?.role.replace(/_/g, " ")}</p>
             </div>
           </div>
         </div>

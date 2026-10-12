@@ -9,11 +9,11 @@ export const recordPaymentSchema = z.object({
     method: z.enum(["BANK_TRANSFER", "CARD", "USSD", "CASH", "MOBILE_MONEY"], {
       required_error: "Payment method is required",
     }),
-    paymentRef: z.string().optional(),
+    paymentRef: z.string().min(5).max(100),
     notes: z.string().max(500).optional(),
   }),
   params: z.object({
-    id: z.string().uuid("Invalid repayment ID"),
+    id: z.string().min(1).max(100),
   }),
 });
 
@@ -22,8 +22,8 @@ export const listRepaymentsSchema = z.object({
     page: z.coerce.number().int().positive().optional().default(1),
     limit: z.coerce.number().int().positive().max(100).optional().default(20),
     status: z.enum(["PENDING", "PAID", "OVERDUE", "PARTIAL"]).optional(),
-    loanId: z.string().uuid().optional(),
-    borrowerId: z.string().uuid().optional(),
+    loanId: z.string().min(1).max(100).optional(),
+    borrowerId: z.string().min(1).max(100).optional(),
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
   }),

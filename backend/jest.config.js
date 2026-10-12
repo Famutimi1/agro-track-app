@@ -5,8 +5,9 @@ module.exports = {
   roots: ["<rootDir>/src"],
   testMatch: ["**/__tests__/**/*.test.ts", "**/*.spec.ts"],
   transform: {
-    "^.+\\.ts$": "ts-jest",
+    "^.+\\.[tj]s$": ["ts-jest", { tsconfig: { allowJs: true } }],
   },
+  transformIgnorePatterns: ["node_modules/(?!(@scure|@noble)/)"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
   },

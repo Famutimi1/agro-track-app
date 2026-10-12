@@ -2,7 +2,7 @@ import { Express } from "express";
 import request from "supertest";
 import jwt from "jsonwebtoken";
 import { User, Role, LenderOrganization, BorrowerProfile } from "@prisma/client";
-import { prisma } from "../setup";
+import { prisma } from "../../config/prisma";
 
 export interface TestUser {
   user: User;

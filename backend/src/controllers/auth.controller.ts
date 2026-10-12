@@ -3,6 +3,8 @@ import { prisma } from "../config/prisma";
 import { AuthService } from "../services/auth.service";
 import { ApiError } from "../utils/api-error";
 import { asyncHandler } from "../utils/async-handler";
+import { clearSessionCookies, refreshTokenFromRequest, setSessionCookies } from "../utils/session-cookies";
+import { disconnectSessionSockets } from "../config/socket";
 
 export const registerLender = asyncHandler(async (req: Request, res: Response) => {
   const { organizationName, organizationType, cacNumber, firstName, lastName, email, phone, password } = req.body;
@@ -38,21 +40,14 @@ export const registerLender = asyncHandler(async (req: Request, res: Response) =
     return { user, org };
   });
 
-  const accessToken = AuthService.generateAccessToken({
-    sub: result.user.id,
-    email: result.user.email,
-    role: result.user.role,
-    lenderId: result.org.id,
-  });
-  const refreshToken = await AuthService.createRefreshToken(result.user.id);
+  const { accessToken, refreshToken } = await AuthService.issueSession(result.user);
+  setSessionCookies(res, accessToken, refreshToken);
 
   res.status(201).json({
     success: true,
     data: {
       user: { id: result.user.id, email: result.user.email, firstName, lastName, role: result.user.role },
       organization: { id: result.org.id, name: result.org.name },
-      accessToken,
-      refreshToken,
     },
   });
 });
@@ -94,19 +89,13 @@ export const registerBorrower = asyncHandler(async (req: Request, res: Response)
     include: { borrowerProfile: true },
   });
 
-  const accessToken = AuthService.generateAccessToken({
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-  });
-  const refreshToken = await AuthService.createRefreshToken(user.id);
+  const { accessToken, refreshToken } = await AuthService.issueSession(user);
+  setSessionCookies(res, accessToken, refreshToken);
 
   res.status(201).json({
     success: true,
     data: {
       user: { id: user.id, email: user.email, firstName, lastName, role: user.role, farmerId },
-      accessToken,
-      refreshToken,
     },
   });
 });
@@ -143,6 +132,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
     const valid2FA = await AuthService.verify2FAToken(user.id, twoFactorToken);
     if (!valid2FA) {
+      await AuthService.recordFailedLogin(email);
       throw ApiError.unauthorized("Invalid 2FA code");
     }
   }
@@ -150,13 +140,8 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   await AuthService.clearLoginAttempts(email);
   await AuthService.updateLastLogin(user.id, req.ip);
 
-  const accessToken = AuthService.generateAccessToken({
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-    lenderId: user.lenderOrgId || undefined,
-  });
-  const refreshToken = await AuthService.createRefreshToken(user.id);
+  const { accessToken, refreshToken } = await AuthService.issueSession(user);
+  setSessionCookies(res, accessToken, refreshToken);
 
   res.json({
     success: true,
@@ -170,37 +155,29 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         lenderId: user.lenderOrgId,
         twoFactorEnabled: user.twoFactorEnabled,
       },
-      accessToken,
-      refreshToken,
     },
   });
 });
 
 export const refresh = asyncHandler(async (req: Request, res: Response) => {
-  const { refreshToken } = req.body;
-
+  const refreshToken = refreshTokenFromRequest(req);
+  if (!refreshToken) throw ApiError.unauthorized("Refresh session required");
   const user = await AuthService.validateRefreshToken(refreshToken);
-  await AuthService.revokeRefreshToken(refreshToken);
-
-  const newAccessToken = AuthService.generateAccessToken({
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-    lenderId: user.lenderOrgId || undefined,
-  });
-  const newRefreshToken = await AuthService.createRefreshToken(user.id);
-
-  res.json({
-    success: true,
-    data: { accessToken: newAccessToken, refreshToken: newRefreshToken },
-  });
+  const newRefreshToken = await AuthService.rotateRefreshToken(refreshToken, user.id);
+  const session = await prisma.refreshToken.findUniqueOrThrow({ where: { token: AuthService.hashToken(newRefreshToken) } });
+  const accessToken = AuthService.generateAccessToken({ sub: user.id, email: user.email, role: user.role, lenderId: user.lenderOrgId || undefined, sid: session.id });
+  setSessionCookies(res, accessToken, newRefreshToken);
+  res.json({ success: true, data: { refreshed: true } });
 });
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
-  const { refreshToken } = req.body;
-  if (refreshToken) {
-    await AuthService.revokeRefreshToken(refreshToken);
+  const token = refreshTokenFromRequest(req);
+  if (token) {
+    const session = await prisma.refreshToken.findUnique({ where: { token: AuthService.hashToken(token) } });
+    await AuthService.revokeRefreshToken(token);
+    if (session) disconnectSessionSockets(session.id);
   }
+  clearSessionCookies(res);
   res.json({ success: true, message: "Logged out" });
 });
 

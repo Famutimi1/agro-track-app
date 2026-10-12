@@ -28,12 +28,7 @@ export interface LoginRequest {
   twoFactorToken?: string;
 }
 
-export interface LoginResponse {
-  user: User;
-  accessToken: string;
-  refreshToken: string;
-  requires2FA?: boolean;
-}
+export type LoginResponse = { user: User; requires2FA?: false } | { requires2FA: true; message: string };
 
 export interface RegisterLenderRequest {
   organizationName: string;
@@ -72,20 +67,17 @@ export const authApi = {
   },
 
   registerLender: async (data: RegisterLenderRequest) => {
-    const res = await api.post<ApiResponse<LoginResponse>>("/auth/register/lender", data);
+    const res = await api.post<ApiResponse<{ user: User }>>("/auth/register/lender", data);
     return res.data.data;
   },
 
   registerBorrower: async (data: RegisterBorrowerRequest) => {
-    const res = await api.post<ApiResponse<LoginResponse>>("/auth/register/borrower", data);
+    const res = await api.post<ApiResponse<{ user: User }>>("/auth/register/borrower", data);
     return res.data.data;
   },
 
   logout: async () => {
-    const refreshToken = localStorage.getItem("refreshToken");
-    await api.post("/auth/logout", { refreshToken });
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
+    await api.post("/auth/logout", {});
   },
 
   getMe: async () => {

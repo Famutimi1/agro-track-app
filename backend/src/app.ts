@@ -7,6 +7,11 @@ import { env } from "./config/env";
 import { errorHandler } from "./middlewares/error-handler";
 import { auditMiddleware } from "./middlewares/audit";
 import { router } from "./routes";
+import { ACCESS_COOKIE, REFRESH_COOKIE, readCookie } from "./utils/session-cookies";
+import { ApiError } from "./utils/api-error";
+import { prisma } from "./config/prisma";
+import { redis } from "./config/redis";
+import { asyncHandler } from "./utils/async-handler";
 
 const app = express();
 
@@ -25,8 +30,20 @@ app.use(rateLimit({
 }));
 
 // Body parsing
-app.use(express.json({ limit: "10mb" }));
+declare global { namespace Express { interface Request { rawBody?: string } } }
+app.use(express.json({ limit: "10mb", verify: (req, _res, buffer) => { (req as express.Request).rawBody = buffer.toString("utf8"); } }));
 app.use(express.urlencoded({ extended: true }));
+
+// Cookies are used only by the configured frontend; reject cross-origin writes.
+app.use((req, _res, next) => {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
+  const origin = req.headers.origin;
+  const usesCookies = readCookie(req.headers.cookie, ACCESS_COOKIE) || readCookie(req.headers.cookie, REFRESH_COOKIE);
+  if ((origin && origin !== new URL(env.FRONTEND_URL).origin) || (usesCookies && !origin)) {
+    return next(ApiError.forbidden("Request origin is not allowed"));
+  }
+  next();
+});
 
 // Logging
 if (env.NODE_ENV !== "test") {
@@ -40,6 +57,12 @@ app.use(auditMiddleware);
 app.get("/api/health", (_req, res) => {
   res.json({ success: true, message: "AgroTrack API is running", timestamp: new Date().toISOString() });
 });
+app.get("/api/ready", asyncHandler(async (_req, res) => {
+  try {
+    await Promise.all([prisma.user.count(), redis.ping()]);
+    res.json({ success: true, message: "Database schema and session store are ready" });
+  } catch { res.status(503).json({ success: false, message: "Database or session store unavailable" }); }
+}));
 
 // Routes
 app.use("/api", router);

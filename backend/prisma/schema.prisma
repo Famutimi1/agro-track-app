@@ -360,7 +360,7 @@ model BorrowerLoan {
   borrower        BorrowerProfile @relation(fields: [borrowerId], references: [id])
   programId       String
   program         Program         @relation(fields: [programId], references: [id])
-  applicationId   String?
+  applicationId   String?         @unique
   application     Application?    @relation(fields: [applicationId], references: [id])
   amount          Decimal         @db.Decimal(12, 2)
   interestRate    Float
@@ -405,6 +405,7 @@ model Disbursement {
   @@index([loanId])
   @@index([status])
   @@index([trancheNumber])
+  @@unique([loanId, trancheNumber])
 }
 
 model Repayment {

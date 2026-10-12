@@ -15,7 +15,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --forceExit"
+    "test:ci": "jest --ci --coverage --forceExit",
+    "test:integration": "node scripts/test-integration.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1073.0",

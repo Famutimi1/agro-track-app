@@ -2,6 +2,8 @@ import { Router } from "express";
 import { authenticate, authorize } from "../middlewares/auth";
 import { asyncHandler } from "../utils/async-handler";
 import { FieldAgentService } from "../services/field-agent.service";
+import { prisma } from "../config/prisma";
+import { ApiError } from "../utils/api-error";
 
 const router = Router();
 
@@ -9,7 +11,7 @@ const router = Router();
 router.post(
   "/",
   authenticate,
-  authorize("SUPER_ADMIN", "LENDER_ADMIN"),
+  authorize("SUPER_ADMIN"),
   asyncHandler(async (req, res) => {
     const agent = await FieldAgentService.create(req.body);
     res.status(201).json({ success: true, data: agent });
@@ -32,6 +34,12 @@ router.get(
   authorize("SUPER_ADMIN", "LENDER_ADMIN", "LENDER_MANAGER", "FIELD_SUPERVISOR"),
   asyncHandler(async (req, res) => {
     const agent = await FieldAgentService.getById(req.params.id);
+    if (req.user!.lenderId) {
+      agent.visits = await prisma.fieldVisit.findMany({ where: { agentId: agent.id, borrowerId: { in: (await prisma.borrowerProfile.findMany({ where: { loans: { some: { program: { lenderOrgId: req.user!.lenderId } } } }, select: { id: true } })).map(b => b.id) } }, orderBy: { createdAt: "desc" }, take: 10 });
+    } else if (req.user!.role === "FIELD_SUPERVISOR") {
+      const supervisor = await prisma.fieldAgentProfile.findUnique({ where: { userId: req.user!.sub } });
+      if (!supervisor || agent.supervisorId !== supervisor.id) throw ApiError.notFound("Field agent not found");
+    }
     res.json({ success: true, data: agent });
   })
 );
@@ -39,7 +47,7 @@ router.get(
 router.patch(
   "/:id",
   authenticate,
-  authorize("SUPER_ADMIN", "LENDER_ADMIN"),
+  authorize("SUPER_ADMIN"),
   asyncHandler(async (req, res) => {
     const agent = await FieldAgentService.update(req.params.id, req.body);
     res.json({ success: true, data: agent });

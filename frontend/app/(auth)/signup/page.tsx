@@ -95,8 +95,6 @@ export default function SignupPage() {
       const { plan, ...registerData } = formData;
       const response = await authApi.registerLender(registerData);
 
-      localStorage.setItem("accessToken", response.accessToken);
-      localStorage.setItem("refreshToken", response.refreshToken);
       setUser(response.user);
 
       setStep(steps.length);

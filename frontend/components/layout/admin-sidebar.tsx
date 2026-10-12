@@ -54,6 +54,8 @@ export function AdminSidebar({ open }: AdminSidebarProps) {
           return (
             <Link
               key={label}
+              aria-label={label}
+              title={label}
               href={href}
               className={cn(
                 "flex items-center gap-2.5 w-full px-2.5 py-[9px] rounded-lg text-[13px] whitespace-nowrap transition-colors border-l-2",

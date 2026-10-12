@@ -7,6 +7,7 @@ import {
   Leaf, Home, Users, MapPin, DollarSign, Settings,
   Menu, X, LogOut, Bell, Wifi, WifiOff
 } from "lucide-react";
+import { SignOutButton } from "@/components/shared/sign-out-button";
 import { FieldAgentGuard } from "@/components/auth";
 
 const navItems = [
@@ -85,13 +86,7 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
 
         {/* Logout */}
         <div className="absolute bottom-4 left-0 right-0 px-3">
-          <Link
-            href="/login"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-orange-200 hover:bg-orange-800/50 hover:text-white transition-colors"
-          >
-            <LogOut size={20} />
-            {sidebarOpen && <span className="text-sm font-medium">Logout</span>}
-          </Link>
+          <SignOutButton />
         </div>
       </aside>
 

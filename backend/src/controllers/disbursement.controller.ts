@@ -10,13 +10,13 @@ export const getDisbursements = asyncHandler(async (req: Request, res: Response)
 });
 
 export const approveDisbursement = asyncHandler(async (req: Request, res: Response) => {
-  const d = await DisbursementService.approve(req.params.id, req.user!.sub);
+  const d = await DisbursementService.approve(req.params.id, req.user!.sub, req.user!.lenderId!);
   res.json({ success: true, data: d });
 });
 
 export const rejectDisbursement = asyncHandler(async (req: Request, res: Response) => {
   const { reason } = req.body;
   if (!reason) throw ApiError.badRequest("Rejection reason is required");
-  const d = await DisbursementService.reject(req.params.id, reason);
+  const d = await DisbursementService.reject(req.params.id, reason, req.user!.lenderId!);
   res.json({ success: true, data: d });
 });

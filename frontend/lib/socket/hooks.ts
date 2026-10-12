@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuthStore } from "../stores/auth.store";
 import { useRealtimeStore } from "../stores";
 import {
   getSocket,
@@ -15,13 +16,11 @@ import { loanKeys, applicationKeys, farmReportKeys, farmScoreKeys, fieldVisitKey
 export function useSocket() {
   const { isConnected, connectionError } = useRealtimeStore();
 
+  const { isAuthenticated } = useAuthStore();
   useEffect(() => {
-    const socket = initSocket();
-
-    return () => {
-      // Don't disconnect on unmount as other components may be using it
-    };
-  }, []);
+    if (isAuthenticated) initSocket();
+    else disconnectSocket();
+  }, [isAuthenticated]);
 
   return {
     isConnected,
@@ -46,10 +45,11 @@ export function useSocketEvent<K extends keyof SocketEvents>(
   event: K,
   callback: SocketEvents[K]
 ) {
+  const { isConnected } = useRealtimeStore();
   useEffect(() => {
     const unsubscribe = subscribeToEvent(event, callback);
     return unsubscribe;
-  }, [event, callback]);
+  }, [event, callback, isConnected]);
 }
 
 export function useRealtimeInvalidation() {

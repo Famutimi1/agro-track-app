@@ -4,6 +4,8 @@ const withPWA = require("next-pwa")({
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development",
   runtimeCaching: [
+    { urlPattern: /^https?:\/\/.*\/api\/.*/i, handler: "NetworkOnly" },
+    { urlPattern: /^https?:\/\/.*s3.*amazonaws\.com\/.*/i, handler: "NetworkOnly" },
     {
       urlPattern: /^https:\/\/api\.mapbox\.com\/.*/i,
       handler: "CacheFirst",
@@ -23,18 +25,6 @@ const withPWA = require("next-pwa")({
         expiration: {
           maxEntries: 100,
           maxAgeSeconds: 60 * 60 * 24 * 30,
-        },
-      },
-    },
-    {
-      urlPattern: /^https?:\/\/.*\/api\/.*/i,
-      handler: "NetworkFirst",
-      options: {
-        cacheName: "api-cache",
-        networkTimeoutSeconds: 10,
-        expiration: {
-          maxEntries: 50,
-          maxAgeSeconds: 60 * 5,
         },
       },
     },

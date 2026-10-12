@@ -144,6 +144,7 @@ export class CooperativeService {
   }
 
   static async getMembers(cooperativeId: string, query: PaginationQuery) {
+    const coop = await prisma.cooperative.findUniqueOrThrow({ where: { id: cooperativeId } });
     const { page, limit, skip } = getPagination(query);
 
     const [members, total] = await Promise.all([
@@ -151,7 +152,7 @@ export class CooperativeService {
         where: { cooperativeId },
         include: {
           user: { select: { firstName: true, lastName: true, email: true, phone: true } },
-          loans: { where: { status: "ACTIVE" }, take: 1 },
+          loans: { where: { status: "ACTIVE", program: { lenderOrgId: coop.lenderOrgId || "__unassigned__" } }, take: 1 },
         },
         skip,
         take: limit,
@@ -175,15 +176,15 @@ export class CooperativeService {
 
     const [totalLoansValue, totalRepaid, activeLoans, averageScore] = await Promise.all([
       prisma.borrowerLoan.aggregate({
-        where: { borrowerId: { in: memberIds } },
+        where: { borrowerId: { in: memberIds }, program: { lenderOrgId: coop.lenderOrgId || "__unassigned__" } },
         _sum: { amount: true },
       }),
       prisma.repayment.aggregate({
-        where: { loan: { borrowerId: { in: memberIds } }, status: "PAID" },
+        where: { loan: { borrowerId: { in: memberIds }, program: { lenderOrgId: coop.lenderOrgId || "__unassigned__" } }, status: { in: ["PAID", "PARTIAL"] } },
         _sum: { paidAmount: true },
       }),
       prisma.borrowerLoan.count({
-        where: { borrowerId: { in: memberIds }, status: "ACTIVE" },
+        where: { borrowerId: { in: memberIds }, program: { lenderOrgId: coop.lenderOrgId || "__unassigned__" }, status: "ACTIVE" },
       }),
       members.length > 0
         ? members.reduce((sum, m) => sum + m.farmScore, 0) / members.length

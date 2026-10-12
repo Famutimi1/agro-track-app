@@ -16,7 +16,7 @@ export const registerBorrowerSchema = z.object({
   lastName: z.string().min(2).max(50),
   phone: z.string().min(10).max(15),
   email: z.string().email().optional(),
-  password: z.string().min(6).max(100),
+  password: z.string().min(8).max(100),
   bvn: z.string().length(11).optional(),
   nin: z.string().length(11).optional(),
   state: z.string().min(2),
@@ -31,6 +31,7 @@ export const registerBorrowerSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  twoFactorToken: z.string().regex(/^\d{6}$/, "Enter a 6-digit authenticator code").optional(),
 });
 
 export const forgotPasswordSchema = z.object({

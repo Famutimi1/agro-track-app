@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BorrowerSidebar } from "@/components/layout/borrower-sidebar";
 import { BorrowerTopbar } from "@/components/layout/borrower-topbar";
 import { BorrowerGuard } from "@/components/auth";
@@ -10,13 +10,14 @@ export default function BorrowerLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  useEffect(() => { setSidebarOpen(window.matchMedia("(min-width: 1024px)").matches); }, []);
 
   return (
     <BorrowerGuard>
       <div className="flex min-h-screen bg-[var(--background)]">
         <BorrowerSidebar open={sidebarOpen} />
-        <div className="flex-1 flex flex-col min-h-screen">
+        <div className="min-w-0 flex-1 flex flex-col min-h-screen">
           <BorrowerTopbar
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}

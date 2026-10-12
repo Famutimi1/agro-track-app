@@ -28,7 +28,7 @@ export function rateLimiter(config: RateLimitConfig) {
         throw ApiError.tooManyRequests(message);
       }
     } catch (err) {
-      if (err instanceof ApiError) throw err;
+      if (err instanceof ApiError) { next(err); return; }
       // If Redis is down, allow the request
     }
 

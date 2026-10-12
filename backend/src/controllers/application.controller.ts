@@ -22,7 +22,7 @@ export class ApplicationController {
 
   static async review(req: Request, res: Response) {
     const reviewerId = (req as any).user.sub;
-    const application = await ApplicationService.review(reviewerId, req.params.id, req.body);
+    const application = await ApplicationService.review(reviewerId, req.user!.lenderId!, req.params.id, req.body);
     res.json({ success: true, data: application });
   }
 
@@ -39,12 +39,12 @@ export class ApplicationController {
   }
 
   static async getById(req: Request, res: Response) {
-    const application = await ApplicationService.getById(req.params.id);
+    const application = await ApplicationService.getById(req.params.id, req.user!);
     res.json({ success: true, data: application });
   }
 
   static async markUnderReview(req: Request, res: Response) {
-    const application = await ApplicationService.markUnderReview(req.params.id);
+    const application = await ApplicationService.markUnderReview(req.params.id, req.user!.lenderId!);
     res.json({ success: true, data: application });
   }
 }

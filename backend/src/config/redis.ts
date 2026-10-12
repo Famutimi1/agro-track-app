@@ -3,6 +3,7 @@ import { env } from "./env";
 import { logger } from "./logger";
 
 export const redis = new Redis(env.REDIS_URL, {
+  keyPrefix: env.REDIS_KEY_PREFIX,
   maxRetriesPerRequest: 3,
   retryStrategy(times) {
     if (times > 10) return null;
